@@ -14,7 +14,7 @@
 
 #include "global.h"
 #define DEBUG
-int goon = 0, ignore = 0;       //用于设置signal信号量
+int goon = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;                //作业头指针
@@ -23,6 +23,20 @@ pid_t fgPid;                     //当前前台作业的进程号
 /*******************************************************
                   工具以及辅助方法
 ********************************************************/
+/*打印提示信息*/
+void printLine()
+{
+    struct passwd *pwd=getpwuid(getuid());
+
+    char hostname[32];
+    //char hostname[]="local";
+    int hn_len=32;
+
+    gethostname(hostname,hn_len);
+
+    printf("\nE!%s@%s:%s$ ", pwd->pw_name, hostname, get_current_dir_name()); //打印提示符信息    
+    fflush(stdout);
+}                  
 /*判断命令是否存在*/
 int exists(char *cmdFile){
     int i = 0;
@@ -129,12 +143,13 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     
     //printf("status:%d code:%d |%d__sig#%d#\n",sip->si_status, sip->si_code, ignore, sig);
 
-    /*if(ignore == 1){
-        ignore = 0;
-        return;
-    }*/
+    if (sip->si_status==SIGTSTP||sip->si_status==SIGSTOP) ctrl_Z();
+    if (sip->si_status==SIGINT||sip->si_status==SIGKILL) ctrl_C();
 
-    if (sip->si_status==SIGCONT||sip->si_status==SIGTSTP) return;
+//    printf("status[%d]\n",sip->si_status);
+
+
+    if (sip->si_status==SIGCONT||sip->si_status==SIGTSTP||sip->si_status==SIGSTOP) return;
     
     pid = sip->si_pid;
 
@@ -162,21 +177,15 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
 void ctrl_Z(){
     Job *now = NULL;
     
-    //printf("fg[%d]\n",fgPid);
     if(fgPid == 0){ //前台没有作业则直接返回
         return;
     }
-    
-    //SIGCHLD信号产生自ctrl+z
-    ignore = 1;
-    
+        
     now = head;
-    //printf("[%d]\n",fgPid);
     while(now != NULL && now->pid != fgPid)
         now = now->next;
     
     if(now == NULL){ //未找到前台作业，则根据fgPid添加前台作业
-        //printf("add job\n");
         now = addJob(fgPid);
     }
     
@@ -187,24 +196,17 @@ void ctrl_Z(){
     now->cmd[len + 1] = '\0';
     printf("\n[%d]\t%s\t%s\n", now->pid, now->state, now->cmd);
     
-    //发送SIGSTOP信号给正在前台运作的工作，将其停止
-    kill(fgPid, SIGSTOP);
     fgPid = 0;
-    //printf("fg[%d]\n",fgPid);
 }
 
 /*组合键命令ctrl+c*/
 void ctrl_C(){
     Job *now = NULL;
     
-    //printf("fg[%d]\n",fgPid);
     if(fgPid == 0){ //前台没有作业则直接返回
         return;
     }
-    
-    //SIGCHLD信号产生自ctrl+c
-    ignore=0;
-    
+        
 	now = head;
 	while(now != NULL && now->pid != fgPid)
 		now = now->next;
@@ -220,9 +222,6 @@ void ctrl_C(){
     now->cmd[len + 1] = '\0';
     printf("\n[%d]\t%s\t%s\n", now->pid, now->state, now->cmd);
     
-	//发送SIGKILL信号给正在前台运作的工作，将其停止
-    kill(fgPid, SIGKILL);
-
     fgPid = 0;
 }
 
@@ -230,10 +229,7 @@ void ctrl_C(){
 void fg_exec(int pid){    
     Job *now = NULL; 
 	int i;
-    
-    //SIGCHLD信号产生自此函数
-    ignore = 1;
-    
+        
 	//根据pid查找作业
     now = head;
 	while(now != NULL && now->pid != pid)
@@ -256,18 +252,24 @@ void fg_exec(int pid){
     now->cmd[i] = '\0';
     
     printf("running %s\n", now->cmd);
+
+    if (tcsetpgrp(0,fgPid)<0)printf("0failed\n");   //交接控制终端
+    if (tcsetpgrp(1,fgPid)<0)printf("1failed\n");
+    if (tcsetpgrp(2,fgPid)<0)printf("2failed\n");
+
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
     sleep(1);
     waitpid(fgPid, NULL, WUNTRACED); //父进程等待前台进程的运行
+
+    if (tcsetpgrp(0,getpid())<0)printf("0failed\n");    //收回控制终端
+    if (tcsetpgrp(1,getpid())<0)printf("1failed\n");
+    if (tcsetpgrp(2,getpid())<0)printf("2failed\n");                
 }
 
 /*bg命令*/
 void bg_exec(int pid){
     Job *now = NULL;
-    
-    //SIGCHLD信号产生自此函数
-    ignore = 1;
-    
+        
 	//根据pid查找作业
 	now = head;
     while(now != NULL && now->pid != pid)
@@ -362,8 +364,9 @@ void init(){
     sigfillset(&action.sa_mask);
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
-    signal(SIGTSTP, ctrl_Z);
-    signal(SIGINT, ctrl_C);
+    signal(SIGTSTP, printLine);
+    signal(SIGINT, printLine);
+    signal(SIGTTOU, SIG_IGN);    
 }
 
 /*******************************************************
@@ -551,8 +554,15 @@ void execOuterCmd(SimpleCmd *cmd){
                 printf("[%d]\t%s\t%s\n", getpid(), RUNNING, inputBuff);
                 kill(getppid(), SIGUSR1);
             }
+            else
+            {
+                signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
+                while(goon == 0) ; //等待父进程SIGUSR1信号，表示前后台已切换
+                goon = 0; //置0，为下一命令做准备
+            }
             
             justArgs(cmd->args[0]);
+            setpgid(0,0);           
             if(execv(cmdBuff, cmd->args) < 0){ //执行命令
                 printf("execv failed!\n");
                 return;
@@ -560,17 +570,30 @@ void execOuterCmd(SimpleCmd *cmd){
         }
 		else{ //父进程
             addJob(pid); //增加新的作业
-            if(cmd ->isBack){ //后台命令             
+            if(cmd ->isBack){ //后台命令  
                 fgPid = 0; //pid置0，为下一命令做准备
-                kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
-                
                 //等待子进程输出
                 signal(SIGUSR1, setGoon);
+                sleep(1);
+                kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
+                
                 while(goon == 0) ;
                 goon = 0;
             }else{ //非后台命令
                 fgPid = pid;
+
+                if (tcsetpgrp(0,fgPid)<0)printf("0failed\n");   //转移控制
+                if (tcsetpgrp(1,fgPid)<0)printf("1failed\n");
+                if (tcsetpgrp(2,fgPid)<0)printf("2failed\n");
+
+                sleep(1);
+                kill(pid, SIGUSR1); //子进程发信号，表示控制已转移
+                
                 waitpid(pid, NULL, WUNTRACED);
+
+                if (tcsetpgrp(0,getpid())<0)printf("0failed\n");    //回收控制
+                if (tcsetpgrp(1,getpid())<0)printf("1failed\n");
+                if (tcsetpgrp(2,getpid())<0)printf("2failed\n");                
             }
 		}
     }else{ //命令不存在
@@ -600,9 +623,9 @@ void execSimpleCmd(SimpleCmd *cmd){
         if(head == NULL){
             printf("尚无任何作业\n");
         } else {
-            printf("index\tpid\tstate\t\tcommand\n");
+            printf("index\tpid\tgid\tstate\t\tcommand\n");
             for(i = 1, now = head; now != NULL; now = now->next, i++){
-                printf("%d\t%d\t%s\t\t%s\n", i, now->pid, now->state, now->cmd);
+                printf("%d\t%d\t%d\t%s\t\t%s\n", i, now->pid, getpgid(now->pid), now->state, now->cmd);
             }
         }
     } else if (strcmp(cmd->args[0], "cd") == 0) { //cd命令

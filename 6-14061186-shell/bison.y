@@ -111,20 +111,10 @@ int main(int argc, char** argv) {
     printf("%s\n","*    Excited Studio (c) 2016-2016 Part of Rights Reserved.  *");
     printf("\n");
     printf("%s\n","\\***********************************************************/");
-    printf("\n");
-
 
     while(1){
 
-        struct passwd *pwd=getpwuid(getuid());
-
-        char hostname[32];
-        //char hostname[]="local";
-        int hn_len=32;
-
-        gethostname(hostname,hn_len);
-
-        printf("E!%s@%s:%s$ ", pwd->pw_name, hostname, get_current_dir_name()); //打印提示符信息
+        printLine();
 
         i = 0;
         while((c = getchar()) != '\n'){ //读入一行命令
