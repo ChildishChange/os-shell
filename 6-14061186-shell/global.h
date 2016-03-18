@@ -22,6 +22,7 @@ extern "C" {
         char **args;    // 命令及参数
         char *input;    // 输入重定向
         char *output;   // 输出重定向
+        struct SimpleCmd* next;
     } SimpleCmd;
 
     typedef struct History {
@@ -36,6 +37,12 @@ extern "C" {
         char state[10];   //作业状态
         struct Job *next; //下一节点指针
     } Job;
+
+    typedef struct PipeTask {
+        pid_t pid;
+        int wp, rp, status;
+        struct PipeTask* next;
+    } pTask;
     
     char inputBuff[100];  //存放输入的命令
     
