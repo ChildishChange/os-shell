@@ -522,7 +522,7 @@ void execOuterCmd(SimpleCmd *cmd){
 				sleep(1);
                 kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
                 
-                //等待子进程输出
+				//等待子进程输出
                 signal(SIGUSR1, setGoon);
                 while(goon == 0) ;
                 goon = 0;
