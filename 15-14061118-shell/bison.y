@@ -1,5 +1,6 @@
 %{
     #include "global.h"
+	#include <unistd.h>
 
     int yylex ();
     void yyerror ();

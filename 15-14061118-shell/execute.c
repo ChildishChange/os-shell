@@ -263,7 +263,7 @@ void addHistory(char *cmd){
 ********************************************************/
 /*通过路径文件获取环境路径*/
 void getEnvPath(int len, char *buf){
-    int i, j, last = 0, pathIndex = 0, temp;
+    int i, j,  pathIndex = 0, temp;
     char path[40];
     
     for(i = 0, j = 0; i < len; i++){
@@ -327,7 +327,7 @@ void init(){
 SimpleCmd* handleSimpleCmdStr(int begin, int end){
     int i, j, k;
     int fileFinished; //记录命令是否解析完毕
-    char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
+    char buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
     SimpleCmd *cmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
     
 	//默认为非后台命令，输入输出重定向为null
@@ -575,7 +575,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 fg_exec(pid);
             }
         }else{
-            printf("fg; 参数不合法，正确格式为：fg %<int>\n");
+            printf("fg; 参数不合法，正确格式为：fg %%<int>\n");
         }
     } else if (strcmp(cmd->args[0], "bg") == 0) { //bg命令
         temp = cmd->args[1];
@@ -587,7 +587,7 @@ void execSimpleCmd(SimpleCmd *cmd){
             }
         }
 		else{
-            printf("bg; 参数不合法，正确格式为：bg %<int>\n");
+            printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
         }
     } else{ //外部命令
         execOuterCmd(cmd);

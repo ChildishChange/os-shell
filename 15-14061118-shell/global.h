@@ -1,5 +1,6 @@
 #ifndef _global_H
 #define _global_H
+#define _GNU_SOURCE
 
 #ifdef	__cplusplus
 extern "C" {
