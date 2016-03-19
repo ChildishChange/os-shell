@@ -11,8 +11,6 @@ extern "C" {
     #define RUNNING "running"
     #define DONE    "done"
     #define KILLED  "killed"
-    
-    #define _GNU_SOURCE
 
     #define _GNU_SOURCE
     #include <stdio.h>

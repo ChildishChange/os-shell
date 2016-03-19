@@ -14,12 +14,17 @@
 
 #include "global.h"
 //#define DEBUG
+
+
 #define DEBUG_PIPE
 int goon = 0, ignore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;                //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
+#define MAX_PIPE 20
+pid_t pipe_pid[MAX_PIPE];
+int pipe_n,pipe_now,pipe_status[MAX_PIPE],pipe_fg;
 
 /*******************************************************
                   工具以及辅助方法
@@ -131,8 +136,8 @@ Job* addJob(pid_t pid){
 void rmJob(int sig, siginfo_t *sip, void* noused){
     pid_t pid;
     Job *now = NULL, *last = NULL;
-    //if (sip->si_status == CLD_CONTINUED) return;
-
+    int i;
+    if (sip->si_status == CLD_CONTINUED) return;
     //printf("****%d\n",sip->si_status);
     // ctrl z ==20    ctrl c == 2
     if(sip->si_status == 20) {
@@ -143,16 +148,47 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
             ctrl_C();
         }
     }
+
+    /*
     if(ignore == 1){
         ignore = 0;
         return;
-    }
+    }*/
     tcsetpgrp(0,getpid()); //恢复主进程到前台
     pid = sip->si_pid;
 
     now = head;
 
     waitpid(pid, NULL, 0);
+    // ***** 处理管道的进程组问题
+
+    if (pipe_n>0){
+        for(i=1;i<=pipe_n;i++){
+            if (pipe_pid[i] == pid) {
+                pipe_status[i] = 0;
+                break;
+            }
+        }
+        printf("****%d %d\n",i,pid);
+        if (i<=pipe_n){
+            while(pipe_now <= pipe_n){
+                if (pipe_status[pipe_now]) break;
+                pipe_now ++;
+            }
+            if (pipe_now <= pipe_n){
+                for(i=pipe_now;i<=pipe_n;i++)
+                    if (pipe_status[i])
+                        setpgid(pipe_pid[i] , pipe_pid[pipe_now]);
+            }else{
+                pipe_now = pipe_n = 0;
+            }
+            if (pipe_fg){
+                tcsetpgrp(0,pipe_pid[pipe_now]);
+                fgPid = pipe_pid[pipe_now];
+            }
+
+        }
+    }
 
 	while(now != NULL && now->pid < pid){
 		last = now;
@@ -175,12 +211,22 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
 /*组合键命令ctrl+z*/
 void ctrl_Z(){
     Job *now = NULL;
+    int i;
     if(fgPid == 0){ //前台没有作业则直接返回
         return;
     }
+    // 管道
+    for(i=1;i<=pipe_n;i++){
+        if (pipe_pid[i] == pid) {
+            pipe_status[i] = 0;
+            break;
+        }
+    }
+
 
     //SIGCHLD信号产生自ctrl+z
     ignore = 1;
+    //perror("***get_ctrlz\n");
     tcsetpgrp(0,getpid());
 	now = head;
 	while(now != NULL && now->pid != fgPid)
@@ -249,12 +295,19 @@ void fg_exec(int pid){
         printf("pid为%d 的作业不存在！\n", pid);
         return;
     }
+    //检测是否为pipe
+    for(i=1;i<=pipe_n;i++){
+        if (pipe_pid[i] == pid) {
+            break;
+        }
+    }
+    if (i<=pipe_n) pipe_fg = 1;
 
     //记录前台作业的pid，修改对应作业状态
     fgPid = now->pid;
     strcpy(now->state, RUNNING);
 
-    signal(SIGTSTP, Sig_void); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
+    //signal(SIGTSTP, Sig_void); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
 		i--;
@@ -262,9 +315,9 @@ void fg_exec(int pid){
 
     printf("%s\n", now->cmd);
 
-    tcsetpgrp(0,now->pid);
-    kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 
+    kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
+    tcsetpgrp(0,now->pid);
     //tcsetpgrp(1,pid);
     waitpid(now->pid, NULL, 0); //父进程等待前台进程的运行
     tcsetpgrp(0,getpid());
@@ -273,9 +326,18 @@ void fg_exec(int pid){
 /*bg命令*/
 void bg_exec(int pid){
     Job *now = NULL;
-
+    int i;
     //SIGCHLD信号产生自此函数
     ignore = 1;
+
+    //检测是否为pipe
+    for(i=1;i<=pipe_n;i++){
+        if (pipe_pid[i] == pid) {
+            break;
+        }
+    }
+    if (i<=pipe_n) pipe_fg = 0;
+
 
 	//根据pid查找作业
 	now = head;
@@ -601,6 +663,7 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
 
         }
 		else{ //父进程
+
             if (dup_flg==0 || dup_flg==2){
                 if (setpgid(pid,pid) < 0){
                     printf("setpgid faild!\n");
@@ -615,7 +678,6 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                 }
             }
 
-
             if(cmd ->isBack){ //后台命令
                 fgPid = 0; //pid置0，为下一命令做准备
                 addJob(pid); //增加新的作业
@@ -626,8 +688,12 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                 //while(goon == 0) ;
                 //goon = 0;
             }else{ //非后台命令
-                if (dup_flg==0 || dup_flg==2) fgPid = pid;
-                tcsetpgrp(0,pid);
+                if (dup_flg==0 || dup_flg==2) {
+                    fgPid = pid;
+                    tcsetpgrp(0,pid);
+                }/*else{
+                    tcsetpgrp(0,in_pid);
+                }*/
                 //tcsetpgrp(1,pid);
                 if (!dup_flg) {
                     waitpid(pid, NULL, 0);
@@ -719,12 +785,13 @@ void execute(){
     execSimpleCmd(cmd, 0, 0, &pid, 0, 0, 0);
 }
 
-#define MAX_PIPE 20
+
 void execute2(){
     int n=0,i=0,r[MAX_PIPE],len;
     SimpleCmd *cmd[MAX_PIPE];
     int pipe_fd[MAX_PIPE][2];
-    pid_t pid[MAX_PIPE],fpid;
+    pid_t *pid;
+    pid = pipe_pid;
     len=strlen(inputBuff);
     printf("****format right****\n");
     r[0] = 0;
@@ -735,30 +802,37 @@ void execute2(){
         }
     r[++n] = len;
     cmd[1] = handleSimpleCmdStr(0, r[1]);
+    // 处理全局变量
+    pipe_n = n;
+    pipe_now = 1;
+    for(i=1;i<=n;i++) pipe_status[i] = 1;
 
     if (pipe(pipe_fd[1]) < 0){
-        printf("管道创建失败\n");
+        perror("管道创建失败\n");
     }
-    execSimpleCmd(cmd[1], 2, 0, &pid[1], 0, pipe_fd[1][1], 0);
-    fpid = pid[1];
-
+    execSimpleCmd(cmd[1], 2, 0, &pid[1], 0, pipe_fd[1][1], pipe_fd[1][0]);
+    close(pipe_fd[1][1]);
+    fgPid = pid[1];
+    pipe_fg = 1;
     for(i=2;i<n;i++){
         if (pipe(pipe_fd[i]) < 0){
-            printf("管道创建失败\n");
+            perror("管道创建失败\n");
         }
+
         cmd[i] = handleSimpleCmdStr(r[i-1] + 1, r[i]);
-        execSimpleCmd(cmd[i], 3, fpid, &pid[i], pipe_fd[i-1][0] , pipe_fd[i][1], r[i-1] + 1);
+        execSimpleCmd(cmd[i], 3, fgPid, &pid[i], pipe_fd[i-1][0] , pipe_fd[i][1], r[i-1] + 1);
+
+        close(pipe_fd[i-1][0]);
+        close(pipe_fd[i][1]);
     }
 
     cmd[n] = handleSimpleCmdStr(r[n-1] + 1, r[n]);
-    execSimpleCmd(cmd[n], 1, fpid, &pid[n], pipe_fd[n-1][0] , 0 , r[n-1] + 1 );
-
-    for(i=1;i<=n;i++){
-        waitpid(pid[n], NULL, 0);
-    }
+    execSimpleCmd(cmd[n], 1, fgPid, &pid[n], pipe_fd[n-1][0] , 0 , r[n-1] + 1 );
+    close(pipe_fd[n-1][0]);
 
     tcsetpgrp(0,getpid());
-
+    pipe_n = 0;
+    pipe_now = 0;
     /*
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
     execSimpleCmd(cmd);*/
