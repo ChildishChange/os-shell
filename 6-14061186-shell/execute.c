@@ -176,6 +176,7 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     }else{
         last->next = now->next;
     }
+    waitpid(pid,NULL,WUNTRACED);
     free(now);
 }
 
