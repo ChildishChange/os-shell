@@ -886,7 +886,9 @@ void execOuterCmd(SimpleCmd *cmd){
 
             if(cmd->isBack){ //若是后台运行命令，等待父进程增加作业
                 signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
-                while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
+                while(goon == 0) 
+                {
+                } //等待父进程SIGUSR1信号，表示作业已加到链表中
                 goon = 0; //置0，为下一命令做准备
                 
                 kill(getppid(), SIGUSR1);
@@ -919,7 +921,9 @@ void execOuterCmd(SimpleCmd *cmd){
                 sleep(1);
                 kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
                 
-                while(goon == 0) ;
+                while(goon == 0) 
+                {
+                }
                 goon = 0;
             }else{ //非后台命令
                 fgPid = pid;
