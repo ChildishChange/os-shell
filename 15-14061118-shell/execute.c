@@ -14,7 +14,6 @@
 
 #include "global.h"
 #define DEBUG
-int goon = 0, ingnore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;                //作业头指针
@@ -81,10 +80,6 @@ void justArgs(char *str){
     }
 }
 
-/*设置goon*/
-void setGoon(){
-    goon = 1;
-}
 
 /*释放环境变量空间*/
 void release(){
@@ -123,16 +118,10 @@ Job* addJob(pid_t pid){
 }
 
 /*移除一个作业*/
-void rmJob(int sig, siginfo_t *sip, void* noused){
-    pid_t pid;
+void rmJob(pid_t pid){
     Job *now = NULL, *last = NULL;
     
-    if(ingnore == 1){
-        ingnore = 0;
-        return;
-    }
     
-    pid = sip->si_pid;
 
     now = head;
 	while(now != NULL && now->pid < pid){
@@ -153,19 +142,47 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     
     free(now);
 }
-
-/*组合键命令ctrl+z*/
-void ctrl_Z(){
-    Job *now = NULL;
+void sg_chld(int sig, siginfo_t *sip, void* noused){
+	pid_t pid;
+	sigset_t sset;
+	Job *now = NULL;
+	now = head;
+	if(sig != SIGCHLD)
+		return;
+	pid = sip->si_pid;
+	sigfillset(&sset);
+	sigdelset(&sset,SIGCHLD);
+	switch(sip->si_code){
+		case CLD_EXITED:
+		case CLD_KILLED:
+		case CLD_DUMPED:
+			tcsetpgrp(STDIN_FILENO,getpid());
+			rmJob(pid);
+			waitpid(pid,NULL,0);
+			return;
+		case CLD_CONTINUED:
+		//	fprintf(stderr,"Child continue\n");
+			strcpy(now->state,RUNNING);
+			now->cmd[strlen(now->cmd)] = '\0';
+    		printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+			if(fgPid){
+				sigsuspend(&sset);
+			}
+			return;
+		case CLD_STOPPED:
+		//	fprintf(stderr,"Child stopped\n");
+			tcsetpgrp(STDIN_FILENO,getpid());
+			break;
+		default:
+			fprintf(stderr,"What condition!!!\n");
+			return;
+	}
     
     if(fgPid == 0){ //前台没有作业则直接返回
         return;
     }
     
-    //SIGCHLD信号产生自ctrl+z
-    ingnore = 1;
     
-	now = head;
 	while(now != NULL && now->pid != fgPid)
 		now = now->next;
     
@@ -178,19 +195,18 @@ void ctrl_Z(){
     now->cmd[strlen(now->cmd)] = '&';
     now->cmd[strlen(now->cmd) + 1] = '\0';
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
-    
-	//发送SIGSTOP信号给正在前台运作的工作，将其停止
-    kill(fgPid, SIGSTOP);
-    fgPid = 0;
+
 }
 
 /*fg命令*/
 void fg_exec(int pid){    
     Job *now = NULL; 
 	int i;
+	sigset_t sset;
+	sigfillset(&sset);
+	sigdelset(&sset,SIGCHLD);
     
     //SIGCHLD信号产生自此函数
-    ingnore = 1;
     
 	//根据pid查找作业
     now = head;
@@ -198,7 +214,7 @@ void fg_exec(int pid){
 		now = now->next;
     
     if(now == NULL){ //未找到作业
-        printf("pid为7%d 的作业不存在！\n", pid);
+        printf("pid为 %d 的作业不存在！\n", pid);
         return;
     }
 
@@ -206,15 +222,16 @@ void fg_exec(int pid){
     fgPid = now->pid;
     strcpy(now->state, RUNNING);
     
-    signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
 		i--;
     now->cmd[i] = '\0';
     
     printf("%s\n", now->cmd);
-    kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
-    waitpid(fgPid, NULL, 0); //父进程等待前台进程的运行
+	tcsetpgrp(STDIN_FILENO,now->pid);
+	kill(now->pid,SIGCONT);
+	sigsuspend(&sset);
+	fprintf(stderr,"out fg\n");
 }
 
 /*bg命令*/
@@ -222,15 +239,15 @@ void bg_exec(int pid){
     Job *now = NULL;
     
     //SIGCHLD信号产生自此函数
-    ingnore = 1;
     
+	fgPid = 0;
 	//根据pid查找作业
 	now = head;
     while(now != NULL && now->pid != pid)
 		now = now->next;
     
     if(now == NULL){ //未找到作业
-        printf("pid为7%d 的作业不存在！\n", pid);
+        printf("pid为 %d 的作业不存在！\n", pid);
         return;
     }
     
@@ -289,7 +306,7 @@ void getEnvPath(int len, char *buf){
 
 /*初始化操作*/
 void init(){
-    int fd, n, len;
+    int fd, len;
     char c, buf[80];
 
 	//打开查找路径文件ysh.conf
@@ -314,11 +331,12 @@ void init(){
     
     //注册信号
     struct sigaction action;
-    action.sa_sigaction = rmJob;
+    action.sa_sigaction = sg_chld;
     sigfillset(&action.sa_mask);
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
-    signal(SIGTSTP, ctrl_Z);
+	signal(SIGTSTP,SIG_IGN);
+	signal(SIGINT,SIG_IGN);
 }
 
 /*******************************************************
@@ -476,6 +494,9 @@ void execOuterCmd(SimpleCmd *cmd){
         }
         
         if(pid == 0){ //子进程
+			signal(SIGCHLD,SIG_DFL);
+			signal(SIGINT,SIG_DFL);
+			signal(SIGTSTP,SIG_DFL);
             if(cmd->input != NULL){ //存在输入重定向
                 if((pipeIn = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
                     printf("不能打开文件 %s！\n", cmd->input);
@@ -498,13 +519,8 @@ void execOuterCmd(SimpleCmd *cmd){
                 }
             }
             
-            if(cmd->isBack){ //若是后台运行命令，等待父进程增加作业
-                signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
-                while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
-                goon = 0; //置0，为下一命令做准备
-                
+            if(cmd->isBack){ 
                 printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
-                kill(getppid(), SIGUSR1);
             }
             
             justArgs(cmd->args[0]);
@@ -514,18 +530,21 @@ void execOuterCmd(SimpleCmd *cmd){
             }
         }
 		else{ //父进程
+			setpgid(pid,pid);			//设置子进程为组长
             if(cmd ->isBack){ //后台命令             
                 fgPid = 0; //pid置0，为下一命令做准备
                 addJob(pid); //增加新的作业
-                kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
                 
-                //等待子进程输出
-                signal(SIGUSR1, setGoon);
-                while(goon == 0) ;
-                goon = 0;
             }else{ //非后台命令
+				sigset_t pbm;
                 fgPid = pid;
-                waitpid(pid, NULL, 0);
+				sigfillset(&pbm);
+				sigdelset(&pbm,SIGCHLD);
+
+				//，结束子进程等待，阻塞自己
+				tcsetpgrp(STDIN_FILENO,pid);//不用多次使用，STDIN和STDOUT都已被改变
+				sigsuspend(&pbm);
+				fgPid = 0;
             }
 		}
     }else{ //命令不存在

@@ -102,10 +102,10 @@ int main(int argc, char** argv) {
     init(); //初始化环境
     commandDone = 0;
     
-    printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
 
-    while(1){
+    do{
         i = 0;
+        printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
         while((c = getchar()) != '\n'){ //读入一行命令
             inputBuff[i++] = c;
         }
@@ -121,8 +121,7 @@ int main(int argc, char** argv) {
             addHistory(inputBuff);
         }
         
-        printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
-     }
+     }while(1);
 
     return (EXIT_SUCCESS);
 }
