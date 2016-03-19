@@ -164,7 +164,7 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
 		//	fprintf(stderr,"Child continue\n");
 			strcpy(now->state,RUNNING);
 			now->cmd[strlen(now->cmd)] = '\0';
-    		printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+    		printf("\n[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
 			if(fgPid){
 				sigsuspend(&sset);
 			}
@@ -194,7 +194,7 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
     strcpy(now->state, STOPPED); 
     now->cmd[strlen(now->cmd)] = '&';
     now->cmd[strlen(now->cmd) + 1] = '\0';
-    printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+    printf("\n[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
 
 }
 
@@ -252,7 +252,7 @@ void bg_exec(int pid){
     }
     
     strcpy(now->state, RUNNING); //修改对象作业的状态
-    printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+    printf("\n[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
     
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 }
@@ -520,7 +520,7 @@ void execOuterCmd(SimpleCmd *cmd){
             }
             
             if(cmd->isBack){ 
-                printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
+                printf("\n[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
             }
             
             justArgs(cmd->args[0]);
