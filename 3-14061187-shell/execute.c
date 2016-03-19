@@ -13,7 +13,8 @@
 #include <sys/termios.h>
 
 #include "global.h"
-#define DEBUG
+//#define DEBUG
+#define DEBUG_PIPE
 int goon = 0, ignore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
@@ -150,6 +151,9 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     pid = sip->si_pid;
 
     now = head;
+
+    waitpid(pid, NULL, 0);
+
 	while(now != NULL && now->pid < pid){
 		last = now;
 		now = now->next;
@@ -177,7 +181,7 @@ void ctrl_Z(){
 
     //SIGCHLD信号产生自ctrl+z
     ignore = 1;
-    tcsetpgrp(0,getpid()); 
+    tcsetpgrp(0,getpid());
 	now = head;
 	while(now != NULL && now->pid != fgPid)
 		now = now->next;
@@ -287,6 +291,7 @@ void bg_exec(int pid){
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
     tcsetpgrp(0,getpid());
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
+    waitpid(now->pid,NULL,0);
 }
 
 /*******************************************************
@@ -362,6 +367,8 @@ void init(){
     //将环境路径存入envPath[]
     getEnvPath(len, buf);
 
+
+
     //注册信号
     struct sigaction action;
     action.sa_sigaction = rmJob;
@@ -389,7 +396,6 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
 	//默认为非后台命令，输入输出重定向为null
     cmd->isBack = 0;
     cmd->input = cmd->output = NULL;
-
     //初始化相应变量
     for(i = begin; i<10; i++){
         buff[i][0] = '\0';
@@ -503,6 +509,8 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
         cmd->output = (char*)malloc(sizeof(char) * (j + 1));
         strcpy(cmd->output, outputFile);
     }
+
+
     #ifdef DEBUG
     printf("****\n");
     printf("isBack: %d\n",cmd->isBack);
@@ -513,6 +521,7 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
     printf("output: %s\n",cmd->output);
     printf("****\n");
     #endif
+
     return cmd;
 }
 
@@ -520,7 +529,14 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
                       命令执行
 ********************************************************/
 /*执行外部命令*/
-void execOuterCmd(SimpleCmd *cmd){
+void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int in_filedes, int out_filedes, int inputBuff_start){
+    /*
+     * dup_flg
+                0 : 不重定向
+                1 : 输入管道
+                2 : 输出管道
+                3 : 同时有输出输出管道
+     */
     pid_t pid;
     int pipeIn, pipeOut;
 
@@ -541,6 +557,13 @@ void execOuterCmd(SimpleCmd *cmd){
                     printf("重定向标准输入错误！\n");
                     return;
                 }
+            }else if ((dup_flg&1)==1){
+                if(dup2(in_filedes,0) == -1){
+                    printf("标准输入管道错误！\n");
+                    return;
+                }else{
+                    close(in_filedes);
+                }
             }
 
             if(cmd->output != NULL){ //存在输出重定向
@@ -552,15 +575,22 @@ void execOuterCmd(SimpleCmd *cmd){
                     printf("重定向标准输出错误！\n");
                     return;
                 }
+            }else if ((dup_flg&2)==2){
+                if(dup2(out_filedes, 1) == -1){
+                    printf("标准输出管道错误！\n");
+                    return;
+                }else{
+                    close(out_filedes);
+                }
             }
 
             if(cmd->isBack){ //若是后台运行命令，等待父进程增加作业
-                signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
-                while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
-                goon = 0; //置0，为下一命令做准备
+                //signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
+                //while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
+                //goon = 0; //置0，为下一命令做准备
 
                 printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
-                kill(getppid(), SIGUSR1);
+                //kill(getppid(), SIGCHLD);
             }
 
             justArgs(cmd->args[0]);
@@ -571,36 +601,49 @@ void execOuterCmd(SimpleCmd *cmd){
 
         }
 		else{ //父进程
-            if (setpgid(pid,pid) < 0){
-                printf("setpgid faild!\n");
+            if (dup_flg==0 || dup_flg==2){
+                if (setpgid(pid,pid) < 0){
+                    printf("setpgid faild!\n");
+                }else{
+                    *out_pid = pid;
+                }
             }else{
-                //printf("****change group success\n");
+                if (setpgid(pid, in_pid) < 0){
+                    printf("setpgid faild!\n");
+                }else{
+                    *out_pid = pid;
+                }
             }
+
 
             if(cmd ->isBack){ //后台命令
                 fgPid = 0; //pid置0，为下一命令做准备
                 addJob(pid); //增加新的作业
-                kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
+                //kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
 
                 //等待子进程输出
-                signal(SIGUSR1, setGoon);
-                while(goon == 0) ;
-                goon = 0;
+                //signal(SIGUSR1, setGoon);
+                //while(goon == 0) ;
+                //goon = 0;
             }else{ //非后台命令
-                fgPid = pid;
+                if (dup_flg==0 || dup_flg==2) fgPid = pid;
                 tcsetpgrp(0,pid);
                 //tcsetpgrp(1,pid);
-                waitpid(pid, NULL, 0);
-                tcsetpgrp(0,getpid());
+                if (!dup_flg) {
+                    waitpid(pid, NULL, 0);
+                    tcsetpgrp(0,getpid());
+                }
             }
 		}
     }else{ //命令不存在
-        printf("找不到命令 15%s\n", inputBuff);
+        printf("找不到命令 %s\n", inputBuff + inputBuff_start);
     }
+
+
 }
 
 /*执行命令*/
-void execSimpleCmd(SimpleCmd *cmd){
+void execSimpleCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int in_filedes, int out_filedes, int inputBuff_start){
     int i, pid;
     char *temp;
     Job *now = NULL;
@@ -641,7 +684,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 fg_exec(pid);
             }
         }else{
-            printf("fg; 参数不合法，正确格式为：fg %<int>\n");
+            printf("fg; 参数不合法，正确格式为：fg %%<int>\n");
         }
     } else if (strcmp(cmd->args[0], "bg") == 0) { //bg命令
         temp = cmd->args[1];
@@ -653,10 +696,10 @@ void execSimpleCmd(SimpleCmd *cmd){
             }
         }
 		else{
-            printf("bg; 参数不合法，正确格式为：bg %<int>\n");
+            printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
         }
     } else{ //外部命令
-        execOuterCmd(cmd);
+        execOuterCmd(cmd, dup_flg, in_pid, out_pid , in_filedes , out_filedes, inputBuff_start);
     }
 
     //释放结构体空间
@@ -671,7 +714,52 @@ void execSimpleCmd(SimpleCmd *cmd){
                      命令执行接口
 ********************************************************/
 void execute(){
+    pid_t pid;
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-    execSimpleCmd(cmd);
+    execSimpleCmd(cmd, 0, 0, &pid, 0, 0, 0);
 }
 
+#define MAX_PIPE 20
+void execute2(){
+    int n=0,i=0,r[MAX_PIPE],len;
+    SimpleCmd *cmd[MAX_PIPE];
+    int pipe_fd[MAX_PIPE][2];
+    pid_t pid[MAX_PIPE],fpid;
+    len=strlen(inputBuff);
+    printf("****format right****\n");
+    r[0] = 0;
+    for(i=0;i<len;i++)
+        if (inputBuff[i] == '|'){
+            r[++n] = i;
+            inputBuff[i] = '\0';
+        }
+    r[++n] = len;
+    cmd[1] = handleSimpleCmdStr(0, r[1]);
+
+    if (pipe(pipe_fd[1]) < 0){
+        printf("管道创建失败\n");
+    }
+    execSimpleCmd(cmd[1], 2, 0, &pid[1], 0, pipe_fd[1][1], 0);
+    fpid = pid[1];
+
+    for(i=2;i<n;i++){
+        if (pipe(pipe_fd[i]) < 0){
+            printf("管道创建失败\n");
+        }
+        cmd[i] = handleSimpleCmdStr(r[i-1] + 1, r[i]);
+        execSimpleCmd(cmd[i], 3, fpid, &pid[i], pipe_fd[i-1][0] , pipe_fd[i][1], r[i-1] + 1);
+    }
+
+    cmd[n] = handleSimpleCmdStr(r[n-1] + 1, r[n]);
+    execSimpleCmd(cmd[n], 1, fpid, &pid[n], pipe_fd[n-1][0] , 0 , r[n-1] + 1 );
+
+    for(i=1;i<=n;i++){
+        waitpid(pid[n], NULL, 0);
+    }
+
+    tcsetpgrp(0,getpid());
+
+    /*
+    SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
+    execSimpleCmd(cmd);*/
+}
