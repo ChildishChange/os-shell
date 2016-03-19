@@ -1,10 +1,4 @@
-user-sh : bison.tab.o execute.o
-	cc -o user-sh bison.tab.o execute.o
-bison.tab.o : bison.tab.c global.h
-	cc -c bison.tab.c
-execute.o : execute.c global.h
-	cc -c execute.c
-bison.tab.c:
-	bison bison.y
+user-sh : bison.o execute.o
+	$(CC) $(CFLAGS) -o $@ $^
 clean :
-	rm user-sh bison.tab.o execute.o bison.tab.c
+	rm *.o  user-sh
