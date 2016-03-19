@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
     do{
         i = 0;
         printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
-        while((c = getchar()) != '\n'){ //读入一行命令
+        while((c = getchar()) != '\n' && c != EOF){ //读入一行命令
             inputBuff[i++] = c;
         }
         inputBuff[i] = '\0';
