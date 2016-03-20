@@ -3,7 +3,7 @@
 
     int yylex ();
     void yyerror ();
-      
+
     int offset, len, commandDone;
 %}
 
@@ -11,7 +11,12 @@
 
 %%
 line            :   /* empty */
+                    |pipe_commmand                  {   execute2(); commandDone = 1;   }
                     |command                        {   execute();  commandDone = 1;   }
+;
+
+pipe_commmand   :    fgCommand '|' fgCommand
+                    |fgCommand '|' pipe_commmand
 ;
 
 command         :   fgCommand
@@ -35,6 +40,8 @@ outputRedirect  :   /* empty */
                     |'>' STRING
 ;
 
+
+
 args            :   /* empty */
                     |args STRING
 ;
@@ -48,22 +55,22 @@ int yylex(){
     //这个函数用来检查inputBuff是否满足lex的定义，实际上并不进行任何操作，初期可略过不看
     int flag;
     char c;
-    
+
 	//跳过空格等无用信息
-    while(offset < len && (inputBuff[offset] == ' ' || inputBuff[offset] == '\t')){ 
+    while(offset < len && (inputBuff[offset] == ' ' || inputBuff[offset] == '\t')){
         offset++;
     }
-    
+
     flag = 0;
     while(offset < len){ //循环进行词法分析，返回终结符
         c = inputBuff[offset];
-        
+
         if(c == ' ' || c == '\t'){
             offset++;
             return STRING;
         }
-        
-        if(c == '<' || c == '>' || c == '&'){
+
+        if(c == '<' || c == '>' || c == '&' || c == '|'){
             if(flag == 1){
                 flag = 0;
                 return STRING;
@@ -71,11 +78,11 @@ int yylex(){
             offset++;
             return c;
         }
-        
+
         flag = 1;
         offset++;
     }
-    
+
     if(flag == 1){
         return STRING;
     }else{
@@ -100,7 +107,7 @@ int main(int argc, char** argv) {
 
     init(); //初始化环境
     commandDone = 0;
-    
+
     printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
 
     while(1){
@@ -112,14 +119,14 @@ int main(int argc, char** argv) {
 
         len = i;
         offset = 0;
-        
+
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
 
         if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息
             commandDone = 0;
             addHistory(inputBuff);
         }
-        
+
         printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
      }
 

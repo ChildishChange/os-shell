@@ -12,6 +12,7 @@ extern "C" {
     #define DONE    "done"
     #define KILLED  "killed"
 
+    #define _GNU_SOURCE
     #include <stdio.h>
     #include <stdlib.h>
 
@@ -46,4 +47,3 @@ extern "C" {
 #endif
 
 #endif	/* _global_H */
-
