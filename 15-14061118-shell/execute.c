@@ -147,6 +147,8 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
 	sigset_t sset;
 	Job *now = NULL;
 	now = head;
+
+	fflush(stderr);
 	if(sig != SIGCHLD)
 		return;
 	pid = sip->si_pid;
@@ -156,21 +158,39 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
 		case CLD_EXITED:
 		case CLD_KILLED:
 		case CLD_DUMPED:
-			tcsetpgrp(STDIN_FILENO,getpid());
-			rmJob(pid);
-			waitpid(pid,NULL,0);
+			//fprintf(stderr,",,[%d] closed\n",sip->si_pid);
+			if(fgPid == pid || waitpid(fgPid,NULL,WNOHANG)>0){//fgPid  ==getpgid(pid)){
+				rmJob(fgPid);
+		//	}
+		//	if(fgPid == pid){
+				tcsetpgrp(STDIN_FILENO,getpid());
+				fgPid= 0;
+			}
+			//else
+			//	killpg(-fgPid,SIGKILL);
+
+			while(waitpid(-1,NULL,WNOHANG)>0);
 			return;
 		case CLD_CONTINUED:
-		//	fprintf(stderr,"Child continue\n");
-			strcpy(now->state,RUNNING);
-			now->cmd[strlen(now->cmd)] = '\0';
-    		printf("\n[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
-			if(fgPid){
+			if(fgPid == getpgid(pid)){
+				while(now !=NULL&& now->pid != fgPid)
+					now = now->next;
+				if(!now)
+					return;
+				strcpy(now->state,RUNNING);
+				now->cmd[strlen(now->cmd)] = '\0';
+    			printf("\n[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+				rmJob(fgPid);
+			}
+			while(fgPid){
 				sigsuspend(&sset);
 			}
 			return;
 		case CLD_STOPPED:
-		//	fprintf(stderr,"Child stopped\n");
+		//	fprintf(stderr,"!![%d] stopped\n",pid);
+		//	if(pid != getpgid(pid))
+		//		break;
+			//fprintf(stderr,",,[%d] stopped\n",sip->si_pid);
 			tcsetpgrp(STDIN_FILENO,getpid());
 			break;
 		default:
@@ -182,12 +202,12 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
         return;
     }
     
-    
 	while(now != NULL && now->pid != fgPid)
 		now = now->next;
     
+    fgPid = 0;
     if(now == NULL){ //未找到前台作业，则根据fgPid添加前台作业
-        now = addJob(fgPid);
+        now = addJob(getpgid(pid));
     }
     
 	//修改前台作业的状态及相应的命令格式，并打印提示信息
@@ -228,9 +248,10 @@ void fg_exec(int pid){
     now->cmd[i] = '\0';
     
     printf("%s\n", now->cmd);
-	tcsetpgrp(STDIN_FILENO,now->pid);
-	kill(now->pid,SIGCONT);
-	sigsuspend(&sset);
+	tcsetpgrp(STDIN_FILENO,getpgid(now->pid));
+	killpg(getpgid(now->pid),SIGCONT);
+	while(fgPid)
+		sigsuspend(&sset);
 	fprintf(stderr,"out fg\n");
 }
 
@@ -351,7 +372,11 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
 	//默认为非后台命令，输入输出重定向为null
     cmd->isBack = 0;
     cmd->input = cmd->output = NULL;
-    
+
+	cmd->next = NULL;
+
+	cmd->pipeIn = 0;
+	cmd->pipeOut = 0;
     //初始化相应变量
     for(i = begin; i<10; i++){
         buff[i][0] = '\0';
@@ -484,19 +509,44 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
 /*执行外部命令*/
 void execOuterCmd(SimpleCmd *cmd){
     pid_t pid;
+	static int pgid = 0;
     int pipeIn, pipeOut;
+	static int tmpp;
+	int p[2] = {0,0};
     
+	if(cmd->next){
+		if(pipe(p)){
+			fprintf(stderr,"Pipe failed\n");
+			goto EXIT;
+		}
+		cmd->pipeOut = p[1];
+		cmd->next->pipeIn = p[0];
+	}
     if(exists(cmd->args[0])){ //命令存在
 
         if((pid = fork()) < 0){
             perror("fork failed");
-            return;
+			goto EXIT;
         }
         
         if(pid == 0){ //子进程
 			signal(SIGCHLD,SIG_DFL);
 			signal(SIGINT,SIG_DFL);
 			signal(SIGTSTP,SIG_DFL);
+			if(!pgid)
+				pgid = getpid();
+			setpgid(getpid(),pgid);
+			if(cmd->pipeIn){
+				dup2(cmd->pipeIn,0);
+				close(cmd->pipeIn);
+				fprintf(stderr,"%d's in is %d\n",getpid(),cmd->pipeIn);
+			}
+			if(cmd->pipeOut){
+				dup2(cmd->pipeOut,1);
+				close(p[1]);
+				close(p[0]);
+				fprintf(stderr,"%d's out is %d\n",getpid(),cmd->pipeOut);
+			}
             if(cmd->input != NULL){ //存在输入重定向
                 if((pipeIn = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
                     printf("不能打开文件 %s！\n", cmd->input);
@@ -530,26 +580,46 @@ void execOuterCmd(SimpleCmd *cmd){
             }
         }
 		else{ //父进程
-			setpgid(pid,pid);			//设置子进程为组长
+		void execSimpleCmd(SimpleCmd *cmd);//declare
+			if(!pgid)
+				pgid = pid;
+			if(tmpp){
+				close(tmpp);
+				tmpp = 0;
+			}
+			if(cmd->next){
+			tmpp = p[0];
+				close(p[1]);
+				execSimpleCmd(cmd->next);
+				goto EXIT;
+			}
+			setpgid(pid,pgid);			//设置子组长
             if(cmd ->isBack){ //后台命令             
                 fgPid = 0; //pid置0，为下一命令做准备
-                addJob(pid); //增加新的作业
+                addJob(pgid); //增加新的作业
                 
             }else{ //非后台命令
 				sigset_t pbm;
-                fgPid = pid;
+                fgPid = getpgid(pid);
 				sigfillset(&pbm);
 				sigdelset(&pbm,SIGCHLD);
 
 				//，结束子进程等待，阻塞自己
-				tcsetpgrp(STDIN_FILENO,pid);//不用多次使用，STDIN和STDOUT都已被改变
-				sigsuspend(&pbm);
-				fgPid = 0;
+				tcsetpgrp(STDIN_FILENO,pgid);//不用多次使用，STDIN和STDOUT都已被改变
+				while(fgPid){
+					sigsuspend(&pbm);
+				}
             }
 		}
     }else{ //命令不存在
+		if(cmd->pipeIn)
+			close(cmd->pipeIn);
+		if(cmd->pipeOut)
+			close(cmd->pipeOut);
         printf("找不到命令 15%s\n", inputBuff);
     }
+EXIT:
+	pgid = 0;
 }
 
 /*执行命令*/
@@ -624,6 +694,27 @@ void execSimpleCmd(SimpleCmd *cmd){
                      命令执行接口
 ********************************************************/
 void execute(){
-    SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
+    SimpleCmd *cmd = NULL;
+	SimpleCmd *p = NULL;
+	int i,l,j;
+	l=strlen(inputBuff);
+	for(i=0,j=0;i<l;++i){
+		if(inputBuff[i]!='|')
+			continue;
+		if(!cmd)
+			cmd = handleSimpleCmdStr(j,i);
+		else{
+			for(p=cmd;p->next!=NULL;p=p->next);
+			p->next = handleSimpleCmdStr(j,i);
+		}
+		j = i+1;
+	}
+	if(!cmd)
+			cmd = handleSimpleCmdStr(j,i);
+		else{
+			for(p=cmd;p->next!=NULL;p=p->next);
+			p->next = handleSimpleCmdStr(j,i);
+		}
+	//cmd = handleSimpleCmdStr(0, strlen(inputBuff));
     execSimpleCmd(cmd);
 }

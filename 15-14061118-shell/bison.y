@@ -20,6 +20,7 @@ command         :   fgCommand
 ;
 
 fgCommand       :   simpleCmd
+					|simpleCmd '|' simpleCmd
 ;
 
 simpleCmd       :   progInvocation inputRedirect outputRedirect

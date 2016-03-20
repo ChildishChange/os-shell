@@ -1,6 +1,8 @@
 #ifndef _global_H
 #define _global_H
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -20,6 +22,8 @@ extern "C" {
         char **args;    // 命令及参数
         char *input;    // 输入重定向
         char *output;   // 输出重定向
+		int pipeIn,pipeOut;
+		struct SimpleCmd *next;
     } SimpleCmd;
 
     typedef struct History {
