@@ -20,18 +20,19 @@ sigset_t WAIT,NONE;
 int goon = 0, ignore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
-Job *head = NULL;                //作业头指针
+Job *head = NULL;               //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
 #define MAX_PIPE 20
 pid_t pipe_pid[MAX_PIPE];
 int pipe_n,pipe_now,pipe_status[MAX_PIPE],pipe_fg;
-
+PipeJob *pipe_head=NULL,*now_pipe=NULL;
+int stop_wait;
 /*******************************************************
                   工具以及辅助方法
 ********************************************************/
 void ctrl_Z();
 void ctrl_C();
-
+void rmJob();
 /*判断命令是否存在*/
 int exists(char *cmdFile){
     int i = 0;
@@ -106,24 +107,7 @@ void release(){
 /*******************************************************
                   信号以及jobs相关
 ********************************************************/
-void wait_pipe(sigset_t t){
-    int i;
-    while(pipe_now && fgPid == pipe_pid[1]){
-        if (sigsuspend(&t) == -1){ //正确
-        }else break;
-    }
-    for(i=1;i<=pipe_n;i++)
-    if (waitpid(pipe_pid[i], NULL, WNOHANG)>0){
-        pipe_status[i] = 0;
-    }
-    while(pipe_now <= pipe_n){
-        if (pipe_status[pipe_now]) break;
-        pipe_now ++;
-    }
-    if (pipe_now > pipe_n){
-        pipe_now = pipe_n = 0;
-    }
-}
+
 
 /*添加新的作业*/
 Job* addJob(pid_t pid){
@@ -150,15 +134,166 @@ Job* addJob(pid_t pid){
     return job;
 }
 
+void addNewPipe(pid_t pid){
+    Job *job = (Job*)malloc(sizeof(Job));
+    PipeJob *pipejob = (PipeJob*)malloc(sizeof(PipeJob)),*now;
+    int i=0;
+    while(inputBuff[i]){
+        if (inputBuff[i] == '|') inputBuff[i] = '\0';
+        i++;
+    }
+
+    job->pid = pid;
+    strcpy(job->cmd, inputBuff);
+    strcpy(job->state, RUNNING);
+    job->next = NULL;
+
+    pipejob->first = pipejob->now = job;
+    pipejob->next_pipe = NULL;
+    pipejob->n = pipe_n;
+    if (pipe_head == NULL){
+        pipe_head = pipejob;
+    }else{
+        now = pipe_head;
+        while(now->next_pipe!=NULL){
+            now = now->next_pipe;
+        }
+        now->next_pipe = pipejob;
+    }
+    now_pipe = pipejob;
+}
+
+void insertPipe(pid_t pid){
+    Job *job = (Job*)malloc(sizeof(Job)),*now;
+
+    job->pid = pid;
+    strcpy(job->cmd, inputBuff);
+    strcpy(job->state, RUNNING);
+    job->next = NULL;
+
+    now_pipe->now ->next = job;
+    now_pipe->now = job;
+}
+
+PipeJob* check_if_pipe(pid_t pid){
+    PipeJob *pipejob = pipe_head;
+    Job *job;
+    if (pipe_head == NULL) return NULL;
+    while(pipejob){
+        job = pipejob->first;
+        while(job){
+            if (job->pid == pid) return pipejob;
+            job = job->next;
+        }
+        pipejob = pipejob->next_pipe;
+    }
+    return NULL;
+}
+
+void release_pipe(PipeJob *pipe){
+    Job *job,*last;
+    job = pipe->first;
+    last = job->next;
+    rmJob(job->pid);
+    while(job) {
+        free(job);
+        job = last;
+        if (job!=NULL) last = job->next;
+    }
+    free(pipe);
+}
+
+void clean_pipe(){
+    PipeJob *pipejob = pipe_head,*last;
+    Job *job;
+    last = NULL;
+    while(pipejob){
+        job = pipejob->first;
+        while(job && pipejob->n){
+            if (strcmp(job->state,FINISHED) != 0){
+                if (waitpid(job->pid,NULL,WNOHANG) > 0){
+                    strcpy(job->state, FINISHED);
+                    pipejob->n --;
+                }
+            }
+            job = job->next;
+        }
+        if (pipejob->n == 0){
+            if (last == NULL) pipe_head = pipejob->next_pipe;
+            else last->next_pipe = pipejob->next_pipe;
+            release_pipe(pipejob);
+            pipejob = NULL;
+            if (last) pipejob = last->next_pipe;
+        }else{
+            last = pipejob;
+            pipejob = pipejob->next_pipe;
+        }
+    }
+}
+/*
+void wait_pipe(sigset_t t){
+    int i;
+    while(pipe_now && fgPid == pipe_pid[1]){
+        if (sigsuspend(&t) == -1){ //正确
+        }else break;
+    }
+    for(i=1;i<=pipe_n;i++)
+    if (waitpid(pipe_pid[i], NULL, WNOHANG)>0){
+        pipe_status[i] = 0;
+    }
+    while(pipe_now <= pipe_n){
+        if (pipe_status[pipe_now]) break;
+        pipe_now ++;
+    }
+    if (pipe_now > pipe_n){
+        pipe_now = pipe_n = 0;
+    }
+}
+*/
+void wait_pipe(PipeJob *pipejob,sigset_t t){
+    Job *job;
+    job = pipejob->first;
+    fprintf(stderr,"****tc0=%d***\n",tcgetpgrp(0));
+    while(pipejob->n && fgPid == job->pid){
+        if (sigsuspend(&t) == -1){ //正确
+        }else break;
+    }
+    fprintf(stderr,"****tc0=%d***\n",tcgetpgrp(0));
+}
+
 /*移除一个作业*/
-void rmJob(int sig, siginfo_t *sip, void* noused){
+void rmJob(int pid){
+    Job *now = NULL, *last = NULL;
+    now = head;
+	while(now != NULL && now->pid < pid){
+		last = now;
+		now = now->next;
+	}
+
+    if(now == NULL){ //作业不存在，则不进行处理直接返回
+        return;
+    }
+
+	//开始移除该作业
+    if(now == head){
+        head = now->next;
+    }else{
+        last->next = now->next;
+    }
+
+    free(now);
+}
+
+//
+void CHLD(int sig, siginfo_t *sip, void* noused){
     pid_t pid;
     Job *now = NULL, *last = NULL;
+    PipeJob *pipejob;
     int i;
+    int pipe_flg;
 
     if (sip->si_status == CLD_CONTINUED || sip->si_status == SIGCONT ||
         sip->si_status == SIGTTOU || sip->si_status == SIGTTIN) return;
-
 
     // Ctrl z = SIGTSTP
 
@@ -173,7 +308,6 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     }
     //*
     if (ignore){
-
         ignore = 0;
         return;
     }//*/
@@ -181,11 +315,12 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
 
     pid = sip->si_pid;
 
-    now = head;
-    i = sip->si_status;
-    waitpid(pid, NULL, 0);
-
     // ***** 处理管道的进程组问题
+    clean_pipe();
+    pipejob = check_if_pipe(pid);
+    if (pipejob !=NULL ) return ;
+    fprintf(stderr,"***fuck !***\n");
+    /*
     if (pipe_n>0){
         int j;
         for(i=1;i<=pipe_n;i++){
@@ -211,26 +346,11 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
             if (pipe_now < pipe_n) return;
         }
     }
+    */
 
+    waitpid(pid, NULL, 0);
     tcsetpgrp(0,getpid()); //恢复主进程到前台
-
-	while(now != NULL && now->pid < pid){
-		last = now;
-		now = now->next;
-	}
-
-    if(now == NULL){ //作业不存在，则不进行处理直接返回
-        return;
-    }
-
-	//开始移除该作业
-    if(now == head){
-        head = now->next;
-    }else{
-        last->next = now->next;
-    }
-
-    free(now);
+    rmJob(pid);
 }
 /*组合键命令ctrl+z*/
 void ctrl_Z(){
@@ -244,7 +364,7 @@ void ctrl_Z(){
     //SIGCHLD信号产生自ctrl+z
 
     ignore = 1;
-
+    pipe_fg = 0;
 	now = head;
 	while(now != NULL && now->pid != fgPid)
 		now = now->next;
@@ -258,11 +378,12 @@ void ctrl_Z(){
     now->cmd[strlen(now->cmd)] = '&';
     now->cmd[strlen(now->cmd) + 1] = '\0';
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
-
+    stop_wait = 1;   // 不调用 wait_pipe
 	//发送SIGSTOP信号给正在前台运作的工作，将其停止
     //kill(fgPid, SIGSTOP);
     fgPid = 0;
 }
+
 void ctrl_C(){
   Job *now = NULL;
   if (fgPid == 0){
@@ -296,6 +417,7 @@ void Sig_void(){
 /*fg命令*/
 void fg_exec(int pid){
     Job *now = NULL;
+    PipeJob *pipejob;
 	int i,ret;
 
     //SIGCHLD信号产生自此函数
@@ -311,6 +433,10 @@ void fg_exec(int pid){
         return;
     }
 
+    //pipe
+    pipejob = check_if_pipe(now->pid);
+    if (pipejob!=NULL) pipe_fg = 1;
+
     //记录前台作业的pid，修改对应作业状态
     fgPid = now->pid;
     strcpy(now->state, RUNNING);
@@ -323,14 +449,18 @@ void fg_exec(int pid){
 
     printf("%s\n", now->cmd);
 
-
     killpg(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
     if (tcsetpgrp(0,now->pid) < 0){
         perror("****fuck****\n");
     }
 
-    if (pipe_pid[1] == fgPid) wait_pipe(WAIT);
+    if (pipejob!=NULL){
+        printf("*****stop_wait=%d******\n",stop_wait);
+        if (!stop_wait) wait_pipe(pipejob,WAIT);
+        stop_wait = 0;
+    }
     else waitpid(now->pid,NULL,0);
+
     tcsetpgrp(0,getpid());
 }
 
@@ -445,7 +575,7 @@ void init(){
     //注册信号
 
     struct sigaction action;
-    action.sa_sigaction = rmJob;
+    action.sa_sigaction = CHLD;
     sigfillset(&action.sa_mask);
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
@@ -463,6 +593,7 @@ void init(){
     sigaddset(&WAIT, SIGCONT);
     pipe_n = pipe_now = 0;
     pipe_fg = 0;
+    stop_wait = 0;
 }
 
 /*******************************************************
@@ -685,7 +816,10 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
 
         }
 		else{ //父进程
-
+            if (dup_flg){
+                if (dup_flg == 2) addNewPipe(pid);
+                else insertPipe(pid);
+            }
             if (dup_flg==0 || dup_flg==2){
                 if (setpgid(pid,pid) < 0){
                     printf("setpgid faild!\n");
@@ -804,6 +938,7 @@ void execSimpleCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,in
 void execute(){
     pid_t pid;
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
+    stop_wait = 0;
     execSimpleCmd(cmd, 0, 0, &pid, 0, 0, 0);
 }
 
@@ -814,6 +949,9 @@ void execute2(){
     int pipe_fd[MAX_PIPE][2];
     pid_t *pid;
     pid = pipe_pid;
+
+
+    stop_wait = 0;
     len=strlen(inputBuff);
     //printf("****format right****\n");
     r[0] = 0;
@@ -827,7 +965,6 @@ void execute2(){
     cmd[1] = handleSimpleCmdStr(0, r[1]);
     for(i=2;i<n;i++) cmd[i] = handleSimpleCmdStr(r[i-1] + 1, r[i]);
     cmd[n] = handleSimpleCmdStr(r[n-1] + 1, r[n]);
-    for(i=1;i<n;i++) inputBuff[r[i]] = '|';
 
     // 处理全局变量
     pipe_n = n;
@@ -856,8 +993,9 @@ void execute2(){
 
     execSimpleCmd(cmd[n], 1, fgPid, &pid[n], pipe_fd[n-1][0] , 0 , r[n-1] + 1 );
     close(pipe_fd[n-1][0]);
+    for(i=1;i<n;i++) inputBuff[r[i]] = '|';
 
-
-    wait_pipe(NONE);
+    if (!stop_wait) wait_pipe(now_pipe,NONE);
+    stop_wait = 0;
     tcsetpgrp(0,getpid());
 }

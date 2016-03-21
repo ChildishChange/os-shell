@@ -11,6 +11,7 @@ extern "C" {
     #define RUNNING "running"
     #define DONE    "done"
     #define KILLED  "killed"
+    #define FINISHED "finished"
 
     #define _GNU_SOURCE
     #include <stdio.h>
@@ -35,6 +36,12 @@ extern "C" {
         char state[10];   //作业状态
         struct Job *next; //下一节点指针
     } Job;
+
+    typedef struct PipeJob{
+        Job *first,*now;
+        int n;
+        struct PipeJob *next_pipe;
+    }PipeJob;
 
     char inputBuff[100];  //存放输入的命令
 
