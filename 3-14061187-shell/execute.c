@@ -16,6 +16,7 @@
 
 
 #define DEBUG_PIPE
+sigset_t WAIT,NONE;
 int goon = 0, ignore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
@@ -105,6 +106,24 @@ void release(){
 /*******************************************************
                   信号以及jobs相关
 ********************************************************/
+void wait_pipe(sigset_t t){
+    int i;
+    while(pipe_now && fgPid == pipe_pid[1]){
+        if (sigsuspend(&t) == -1){ //正确
+        }else break;
+    }
+    for(i=1;i<=pipe_n;i++)
+    if (waitpid(pipe_pid[i], NULL, WNOHANG)>0){
+        pipe_status[i] = 0;
+    }
+    while(pipe_now <= pipe_n){
+        if (pipe_status[pipe_now]) break;
+        pipe_now ++;
+    }
+    if (pipe_now > pipe_n){
+        pipe_now = pipe_n = 0;
+    }
+}
 
 /*添加新的作业*/
 Job* addJob(pid_t pid){
@@ -137,10 +156,11 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     Job *now = NULL, *last = NULL;
     int i;
 
-    if (sip->si_status == CLD_CONTINUED || sip->si_status == SIGCONT) return;
+    if (sip->si_status == CLD_CONTINUED || sip->si_status == SIGCONT ||
+        sip->si_status == SIGTTOU || sip->si_status == SIGTTIN) return;
 
 
-    // Ctrl z = SIGCHLD + SIGTSTP
+    // Ctrl z = SIGTSTP
 
     //if (sip->si_status == SIGTSTP) return;
     if (sip->si_status == SIGTSTP) {
@@ -158,34 +178,41 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
         return;
     }//*/
 
-    tcsetpgrp(0,getpid()); //恢复主进程到前台
+
     pid = sip->si_pid;
 
     now = head;
+    i = sip->si_status;
     waitpid(pid, NULL, 0);
 
     // ***** 处理管道的进程组问题
     if (pipe_n>0){
+        int j;
         for(i=1;i<=pipe_n;i++){
             if (pipe_pid[i] == pid) {
                 pipe_status[i] = 0;
                 break;
             }
         }
-        if (i<=pipe_n){ // 是管道工作
-            for(i=1;i<=pipe_n;i++)
-            if (waitpid(pipe_pid[i], NULL, WNOHANG)>0){
-                pipe_status[i] = 0;
-            }
-            while(pipe_now <= pipe_n){
-                if (pipe_status[pipe_now]) break;
-                pipe_now ++;
-            }
-            if (pipe_now > pipe_n){
-                pipe_now = pipe_n = 0;
-            }
+        j = i;
+        for(i=1;i<=pipe_n;i++)
+        if (waitpid(pipe_pid[i], NULL, WNOHANG)>0){
+            pipe_status[i] = 0;
+        }
+        while(pipe_now <= pipe_n){
+            if (pipe_status[pipe_now]) break;
+            pipe_now ++;
+        }
+        if (pipe_now > pipe_n){
+            pipe_now = pipe_n = 0;
+        }
+
+        if (j<=pipe_n){ // 是管道工作
+            if (pipe_now < pipe_n) return;
         }
     }
+
+    tcsetpgrp(0,getpid()); //恢复主进程到前台
 
 	while(now != NULL && now->pid < pid){
 		last = now;
@@ -213,15 +240,6 @@ void ctrl_Z(){
     if(fgPid == 0){ //前台没有作业则直接返回
         return;
     }
-    // 管道
-    /*
-    for(i=1;i<=pipe_n;i++){
-        if (pipe_pid[i] == pid) {
-            pipe_status[i] = 0;
-            break;
-        }
-    }
-    */
 
     //SIGCHLD信号产生自ctrl+z
 
@@ -268,7 +286,6 @@ void ctrl_C(){
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
 
 	//发送SIGSTOP信号给正在前台运作的工作，将其退出
-    //kill(fgPid, SIGINT);
     fgPid = 0;
 }
 
@@ -279,7 +296,7 @@ void Sig_void(){
 /*fg命令*/
 void fg_exec(int pid){
     Job *now = NULL;
-	int i;
+	int i,ret;
 
     //SIGCHLD信号产生自此函数
     ignore = 1;
@@ -311,8 +328,9 @@ void fg_exec(int pid){
     if (tcsetpgrp(0,now->pid) < 0){
         perror("****fuck****\n");
     }
-    //tcsetpgrp(1,pid);
-    waitpid(now->pid, NULL, 0); //父进程等待前台进程的运行
+
+    if (pipe_pid[1] == fgPid) wait_pipe(WAIT);
+    else waitpid(now->pid,NULL,0);
     tcsetpgrp(0,getpid());
 }
 
@@ -425,6 +443,7 @@ void init(){
 
 
     //注册信号
+
     struct sigaction action;
     action.sa_sigaction = rmJob;
     sigfillset(&action.sa_mask);
@@ -437,6 +456,11 @@ void init(){
     signal(SIGINT , Sig_void);
     signal(SIGTTOU , Sig_void);
     signal(SIGTTIN , Sig_void);
+
+    sigemptyset(&WAIT);
+    sigemptyset(&NONE);
+    sigaddset(&WAIT, CLD_CONTINUED);
+    sigaddset(&WAIT, SIGCONT);
     pipe_n = pipe_now = 0;
     pipe_fg = 0;
 }
@@ -640,7 +664,10 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                     close(out_filedes);
                 }
             }
-
+            /*
+            if (dup_flg == 2){
+                close(in_filedes);
+            }*/
             if(cmd->isBack){ //若是后台运行命令，等待父进程增加作业
                 //signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
                 //while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
@@ -788,7 +815,7 @@ void execute2(){
     pid_t *pid;
     pid = pipe_pid;
     len=strlen(inputBuff);
-    printf("****format right****\n");
+    //printf("****format right****\n");
     r[0] = 0;
     for(i=0;i<len;i++)
         if (inputBuff[i] == '|'){
@@ -810,15 +837,15 @@ void execute2(){
     if (pipe(pipe_fd[1]) < 0){
         perror("管道创建失败\n");
     }
-    execSimpleCmd(cmd[1], 2, 0, &pid[1], 0, pipe_fd[1][1], pipe_fd[1][0]);
-    close(pipe_fd[1][1]);
     fgPid = pid[1];
     pipe_fg = 1;
+    execSimpleCmd(cmd[1], 2, 0, &pid[1],  pipe_fd[1][0], pipe_fd[1][1] , 0);
+    close(pipe_fd[1][1]);
+
     for(i=2;i<n;i++){
         if (pipe(pipe_fd[i]) < 0){
             perror("管道创建失败\n");
         }
-
 
         execSimpleCmd(cmd[i], 3, fgPid, &pid[i], pipe_fd[i-1][0] , pipe_fd[i][1], r[i-1] + 1);
 
@@ -830,14 +857,7 @@ void execute2(){
     execSimpleCmd(cmd[n], 1, fgPid, &pid[n], pipe_fd[n-1][0] , 0 , r[n-1] + 1 );
     close(pipe_fd[n-1][0]);
 
-    tcsetpgrp(0,getpid());
 
-    /*
-    for(i=1;i<=pipe_n;i++)
-        if (pipe_status[i]) waitpid(pipe_pid[i],NULL,0);
-    pipe_n = 0;
-    pipe_now = 0;*/
-    /*
-    SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-    execSimpleCmd(cmd);*/
+    wait_pipe(NONE);
+    tcsetpgrp(0,getpid());
 }
