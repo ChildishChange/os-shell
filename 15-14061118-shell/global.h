@@ -10,9 +10,6 @@ extern "C" {
     
     #define HISTORY_LEN 10
     
-    #define STOPPED "stopped"
-    #define RUNNING "running"
-    #define DONE    "done"
 
     #include <stdio.h>
     #include <stdlib.h>
@@ -32,12 +29,7 @@ extern "C" {
         char cmds[HISTORY_LEN][100];  //历史命令
     } History;
 
-    typedef struct Job {
-        int pid;          //进程号
-        char cmd[100];    //命令名
-        char state[10];   //作业状态
-        struct Job *next; //下一节点指针
-    } Job;
+    
     
     char inputBuff[100];  //存放输入的命令
     
