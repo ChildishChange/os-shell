@@ -14,7 +14,6 @@
 #include "global.h"
 //#define DEBUG
 
-
 #define DEBUG_PIPE
 sigset_t WAIT,NONE;
 int goon = 0, ignore = 0;       //用于设置signal信号量
@@ -24,7 +23,7 @@ Job *head = NULL;               //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
 #define MAX_PIPE 20
 pid_t pipe_pid[MAX_PIPE];
-int pipe_n,pipe_now,pipe_status[MAX_PIPE],pipe_fg;
+int pipe_n,pipe_fg;
 PipeJob *pipe_head=NULL,*now_pipe=NULL;
 int stop_wait;
 /*******************************************************
@@ -253,12 +252,11 @@ void wait_pipe(sigset_t t){
 void wait_pipe(PipeJob *pipejob,sigset_t t){
     Job *job;
     job = pipejob->first;
-    fprintf(stderr,"****tc0=%d***\n",tcgetpgrp(0));
+
     while(pipejob->n && fgPid == job->pid){
         if (sigsuspend(&t) == -1){ //正确
         }else break;
     }
-    fprintf(stderr,"****tc0=%d***\n",tcgetpgrp(0));
 }
 
 /*移除一个作业*/
@@ -319,7 +317,6 @@ void CHLD(int sig, siginfo_t *sip, void* noused){
     clean_pipe();
     pipejob = check_if_pipe(pid);
     if (pipejob !=NULL ) return ;
-    fprintf(stderr,"***fuck !***\n");
     /*
     if (pipe_n>0){
         int j;
@@ -455,7 +452,6 @@ void fg_exec(int pid){
     }
 
     if (pipejob!=NULL){
-        printf("*****stop_wait=%d******\n",stop_wait);
         if (!stop_wait) wait_pipe(pipejob,WAIT);
         stop_wait = 0;
     }
@@ -591,7 +587,7 @@ void init(){
     sigemptyset(&NONE);
     sigaddset(&WAIT, CLD_CONTINUED);
     sigaddset(&WAIT, SIGCONT);
-    pipe_n = pipe_now = 0;
+    pipe_n  = 0;
     pipe_fg = 0;
     stop_wait = 0;
 }
@@ -953,7 +949,7 @@ void execute2(){
 
     stop_wait = 0;
     len=strlen(inputBuff);
-    //printf("****format right****\n");
+
     r[0] = 0;
     for(i=0;i<len;i++)
         if (inputBuff[i] == '|'){
@@ -968,8 +964,6 @@ void execute2(){
 
     // 处理全局变量
     pipe_n = n;
-    pipe_now = 1;
-    for(i=1;i<=n;i++) pipe_status[i] = 1;
 
     if (pipe(pipe_fd[1]) < 0){
         perror("管道创建失败\n");
