@@ -145,19 +145,19 @@ void release(){
 //    free(now);
 //}
 
-void sg_usr(int sig, siginfo_t *sip, void* noused)
-{
-	pid_t pid = sip->si_pid;
-	if(!pgid){
-		fgPid = pid;
-		pgid = pid;
-	}
-	fprintf(stderr,"parent %d recieve from %d\n",getpid(),pid);
-	setpgid(pid,pgid);
-	addJob(pid);
-//	kill(pid,SIGUSR2);
-//	fprintf(stderr,"send to %d\n",pid);
-}
+//void sg_usr(int sig, siginfo_t *sip, void* noused)
+//{
+//	pid_t pid = sip->si_pid;
+//	if(!pgid){
+//		fgPid = pid;
+//		pgid = pid;
+//	}
+//	fprintf(stderr,"parent %d recieve from %d\n",getpid(),pid);
+//	setpgid(pid,pgid);
+//	addJob(pid);
+////	kill(pid,SIGUSR2);
+////	fprintf(stderr,"send to %d\n",pid);
+//}
 
 void sg_null()
 {
@@ -190,8 +190,9 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
 			//else
 			//	killpg(-fgPid,SIGKILL);
 
-			while((p = waitpid(-fgPid,NULL,WNOHANG))>0){
-				if(!rmJob(p)){
+			while((p = waitpid(-1,NULL,WNOHANG))>0){
+				pid_t t = rmJob(p);
+				if(t<0 && !(fgPid+t)){
 					fgPid = 0;
 					tcsetpgrp(STDIN_FILENO,getpid());
 				}
@@ -394,8 +395,8 @@ void init(){
     sigaction(SIGCHLD, &action, NULL);
 	signal(SIGTSTP,SIG_IGN);
 	signal(SIGINT,SIG_IGN);
-	action.sa_sigaction =  sg_usr;
-	sigaction(SIGUSR1,&action,NULL);
+	//action.sa_sigaction =  sg_usr;
+	//sigaction(SIGUSR1,&action,NULL);
 }
 
 /*******************************************************
@@ -587,13 +588,11 @@ void execOuterCmd(SimpleCmd *cmd){
 			if(cmd->pipeIn){
 				dup2(cmd->pipeIn,0);
 				close(cmd->pipeIn);
-				fprintf(stderr,"%d's in is %d\n",getpid(),cmd->pipeIn);
 			}
 			if(cmd->pipeOut){
 				dup2(cmd->pipeOut,1);
 				close(p[1]);
 				close(p[0]);
-				fprintf(stderr,"%d's out is %d\n",getpid(),cmd->pipeOut);
 			}
             if(cmd->input != NULL){ //存在输入重定向
                 if((pipeIn = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
