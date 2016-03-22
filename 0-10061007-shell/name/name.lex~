@@ -9,7 +9,7 @@ eq [=]
 name {char}+
 age {num}+
 %%
-{name} { yylval = strdup(yytext);return NAME; }
+{name} { yylval = strdup(yytext);printf("name!\n");return NAME; }
 {eq} { return EQ; }
 {age} { yylval = strdup(yytext);return AGE; }
 %%
