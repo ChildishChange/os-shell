@@ -64,7 +64,6 @@ void addJob(pid_t pid)
 {
 	Job* tmp;
 	plistInt t;
-	//pid = getpgid(pid);
 	findJobg(pid,&tmp);
 	if(tmp){
 		t = tmp->pids;
@@ -73,22 +72,19 @@ void addJob(pid_t pid)
 		if(t->pid == pid)
 			return;
 		t->next = (plistInt)malloc(sizeof(listInt));
-		fprintf(stderr,"-----	add job %d	%d\n",tmp->pgid,pid);
-		//fprintf(stderr,"----	malloc %d @%d\n",(int)t->next,getpid());
+		//fprintf(stderr,"-----	add job %d	%d\n",tmp->pgid,pid);
 		t->next->next=NULL;
 		t->next->pid = pid;
 	}
 	else{
 		int i = 1;
 		tmp = (Job*)malloc(sizeof(Job));
-		fprintf(stderr,"-----	new job %d	%d\n",getpgid(pid),pid);
-		//fprintf(stderr,"----	malloc %d @%d\n",(int)tmp,getpid());
+		//fprintf(stderr,"-----	new job %d	%d\n",getpgid(pid),pid);
 		tmp->next = NULL;
 		tmp->state = RUNNING;
 		tmp->pids = NULL;
 		strncpy(tmp->cmd,inputBuff,100);//strlen(inputBuff));
 		tmp->pids = (plistInt)malloc(sizeof(listInt));
-		//fprintf(stderr,"----	malloc %d @%d\n",(int)tmp->pids,getpid());
 		tmp->pids->pid = pid;
 		tmp->pids->next = NULL;
 		if(!list)
@@ -119,9 +115,8 @@ pid_t rmJob(pid_t pid)
 	p = tmp->pids;
 	if(p->pid == pid){
 		tmp->pids = p->next;
-		fprintf(stderr,"-----	rm job %d\n",pid);
+		//fprintf(stderr,"-----	rm job %d\n",pid);
 		free(p);
-		//fprintf(stderr,"----	free %d @%d\n",(int)p,getpid());
 		
 	}
 	else{
@@ -131,8 +126,7 @@ pid_t rmJob(pid_t pid)
 			plistInt t = p->next;
 			p->next = t->next;
 			free(t);
-			fprintf(stderr,"-----	rm job %d\n",pid);
-			//fprintf(stderr,"----	free %d @%d\n",(int)t,getpid());
+			//fprintf(stderr,"-----	rm job %d\n",pid);
 		}
 	}
 	if(tmp->pids==NULL){
@@ -148,9 +142,8 @@ pid_t rmJob(pid_t pid)
 				t = t->next;
 			t->next = tmp->next;
 		}
-		//fprintf(stderr,"----	atp free %d @%d\n",(int)tmp,getpid());
 		free(tmp);
-		fprintf(stderr,"-----	destroy job %d\n",pid);
+		//fprintf(stderr,"-----	destroy job %d\n",pid);
 		return -tpp;
 			
 	}
