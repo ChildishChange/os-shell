@@ -17,7 +17,7 @@ void displayJobs()
 	int i;
 	Job* tmp;
 	for(i=1,tmp=list;tmp;tmp=tmp->next,++i)
-		printf("[%d]\t\t%s\t\t%s\n",i,tmp->state,tmp->cmd);
+		printf("[%d]\t%d\t%s\t\t%s\n",i,getpgid(tmp->pids->pid),tmp->state,tmp->cmd);
 }
 
 int findJob(pid_t pid,Job** job)
@@ -41,12 +41,31 @@ int findJob(pid_t pid,Job** job)
 	}
 	return 0;
 }
+int findJobg(pid_t pid,Job** job)
+{
+	Job* tmp = list;
+	int i=0;
+	*job = NULL;
+	if(!list)
+		return 0;
+	while(tmp){
+		++i;
+		if(getpgid(tmp->pids->pid) == getpgid(pid)){
+			*job = tmp;
+			return i;
+		}
+		tmp = tmp->next;
+	}
+	return 0;
+
+}
+
 void addJob(pid_t pid)
 {
 	Job* tmp;
 	plistInt t;
 	//pid = getpgid(pid);
-	findJob(getpgid(pid),&tmp);
+	findJobg(pid,&tmp);
 	if(tmp){
 		t = tmp->pids;
 		while(t->next && t->pid != pid)
@@ -54,20 +73,22 @@ void addJob(pid_t pid)
 		if(t->pid == pid)
 			return;
 		t->next = (plistInt)malloc(sizeof(listInt));
-		fprintf(stderr,"----	malloc %d @%d\n",(int)t->next,getpid());
+		fprintf(stderr,"-----	add job %d	%d\n",getpgid(tmp->pids->pid),pid);
+		//fprintf(stderr,"----	malloc %d @%d\n",(int)t->next,getpid());
 		t->next->next=NULL;
 		t->next->pid = pid;
 	}
 	else{
 		int i = 1;
 		tmp = (Job*)malloc(sizeof(Job));
-		fprintf(stderr,"----	malloc %d @%d\n",(int)tmp,getpid());
+		fprintf(stderr,"-----	new job %d	%d\n",getpgid(pid),pid);
+		//fprintf(stderr,"----	malloc %d @%d\n",(int)tmp,getpid());
 		tmp->next = NULL;
 		tmp->state = RUNNING;
 		tmp->pids = NULL;
 		strncpy(tmp->cmd,inputBuff,100);//strlen(inputBuff));
 		tmp->pids = (plistInt)malloc(sizeof(listInt));
-		fprintf(stderr,"----	malloc %d @%d\n",(int)tmp->pids,getpid());
+		//fprintf(stderr,"----	malloc %d @%d\n",(int)tmp->pids,getpid());
 		tmp->pids->pid = pid;
 		tmp->pids->next = NULL;
 		if(!list)
@@ -91,14 +112,15 @@ Job* rmJob(pid_t pid)
 	Job* tmp;
 	plistInt p;
 	int i;
-	i = findJob(pid,&tmp);
+	i = findJobg(pid,&tmp);
 	if(!tmp)
 		return NULL;
 	p = tmp->pids;
 	if(p->pid == pid){
 		tmp->pids = p->next;
+		fprintf(stderr,"-----	rm job %d\n",pid);
 		free(p);
-		fprintf(stderr,"----	free %d @%d\n",(int)p,getpid());
+		//fprintf(stderr,"----	free %d @%d\n",(int)p,getpid());
 		
 	}
 	else{
@@ -108,7 +130,8 @@ Job* rmJob(pid_t pid)
 			plistInt t = p->next;
 			p->next = t->next;
 			free(t);
-			fprintf(stderr,"----	free %d @%d\n",(int)t,getpid());
+			fprintf(stderr,"-----	rm job %d\n",pid);
+			//fprintf(stderr,"----	free %d @%d\n",(int)t,getpid());
 		}
 	}
 	if(tmp->pids==NULL){
@@ -122,8 +145,9 @@ Job* rmJob(pid_t pid)
 				t = t->next;
 			t->next = tmp->next;
 		}
-		fprintf(stderr,"----	atp free %d @%d\n",(int)tmp,getpid());
+		//fprintf(stderr,"----	atp free %d @%d\n",(int)tmp,getpid());
 		free(tmp);
+		fprintf(stderr,"-----	destroy job %d\n",pid);
 		fprintf(stderr,"((((	atp ok\n");
 		return NULL;
 			

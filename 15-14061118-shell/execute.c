@@ -563,23 +563,27 @@ void execOuterCmd(SimpleCmd *cmd){
 			sigset_t set;
 			sigfillset(&set);
 
-        if((pid = fork()) < 0){
+        if((pid = vfork()) < 0){
             perror("fork failed");
 			goto EXIT;
         }
         
         if(pid == 0){ //子进程
-			signal(SIGUSR2,sg_null);
-			sigdelset(&set,SIGUSR2);
-			fprintf(stderr,"child %d to %d\n",getpid(),getppid());
-			kill(getppid(),SIGUSR1);
-			sigsuspend(&set);
-			fprintf(stderr,"%d ok\n",getpid());
+			//signal(SIGUSR2,sg_null);
+			//sigdelset(&set,SIGUSR2);
+			//fprintf(stderr,"child %d to %d\n",getpid(),getppid());
+			//kill(getppid(),SIGUSR1);
+			//sigsuspend(&set);
+			//fprintf(stderr,"%d ok\n",getpid());
+			if(!pgid)
+				pgid = getpid();
+			setpgid(getpid(),pgid);
 			signal(SIGCHLD,SIG_DFL);
 			signal(SIGINT,SIG_DFL);
 			signal(SIGTSTP,SIG_DFL);
 			signal(SIGUSR1,SIG_DFL);
 			signal(SIGUSR2,SIG_DFL);
+			addJob(getpid());
 			if(cmd->pipeIn){
 				dup2(cmd->pipeIn,0);
 				close(cmd->pipeIn);
@@ -625,15 +629,15 @@ void execOuterCmd(SimpleCmd *cmd){
         }
 		else{ //父进程
 		void execSimpleCmd(SimpleCmd *cmd);//declare
-			sigdelset(&set,SIGUSR1);
-			sigsuspend(&set);
-			if(!pgid)
-				pgid = pid;
+			//sigdelset(&set,SIGUSR1);
+			//sigsuspend(&set);
+			if(!fgPid)
+				fgPid = pid;
 			if(tmpp){
 				close(tmpp);
 				tmpp = 0;
 			}
-			setpgid(pid,pgid);			//设置子组长
+		//	setpgid(pid,pgid);			//设置子组长
             //addJob(pid); //增加新的作业
 			//kill(pid,SIGCONT);
 			if(cmd->next){
@@ -645,7 +649,7 @@ void execOuterCmd(SimpleCmd *cmd){
             if(cmd ->isBack){ //后台命令             
                 fgPid = 0; //pid置0，为下一命令做准备
 				pgid = 0;
-				killpg(fgPid,SIGUSR2);
+			//	killpg(fgPid,SIGUSR2);
                 
             }else{ //非后台命令
 				sigset_t pbm;
@@ -656,7 +660,7 @@ void execOuterCmd(SimpleCmd *cmd){
 				//，结束子进程等待，阻塞自己
 				tcsetpgrp(STDIN_FILENO,pgid);//不用多次使用，STDIN和STDOUT都已被改变
 				pgid=0;
-				killpg(fgPid,SIGUSR2);
+			//	killpg(fgPid,SIGUSR2);
                 
 				while(fgPid){
 					sigsuspend(&pbm);
@@ -738,9 +742,12 @@ void execSimpleCmd(SimpleCmd *cmd){
     //释放结构体空间
     for(i = 0; cmd->args[i] != NULL; i++){
         free(cmd->args[i]);
-        free(cmd->input);
-        free(cmd->output);
     }
+    free(cmd->input);
+    free(cmd->output);
+	free(cmd->args[i]);
+	free(cmd->args);
+	free(cmd);
 }
 
 /*******************************************************
