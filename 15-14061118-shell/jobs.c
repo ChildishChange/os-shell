@@ -5,13 +5,13 @@
 #include <malloc.h>
 #include <string.h>
 static Job* list;
-//extern char* inputBuff;
 
 typedef struct listInt{
 	int pid;
 	struct listInt* next;
 }*plistInt;
 
+//打印作业状态
 void displayJobs()
 {
 	int i;
@@ -20,6 +20,7 @@ void displayJobs()
 		printf("[%d]\t%d\t%s\t\t%s\n",i,getpgid(tmp->pids->pid),tmp->state,tmp->cmd);
 }
 
+//根据pid查找作业，返回作业号，参数返回查找到的作业
 int findJob(pid_t pid,Job** job)
 {
 	Job* tmp = list;
@@ -41,6 +42,7 @@ int findJob(pid_t pid,Job** job)
 	}
 	return 0;
 }
+//根据pid查找其所属或应当所属作业，返回作业号，参数返回查找到的作业
 int findJobg(pid_t pid,Job** job)
 {
 	Job* tmp = list;
@@ -60,6 +62,7 @@ int findJobg(pid_t pid,Job** job)
 
 }
 
+//将一个进程添加到所属作业中
 void addJob(pid_t pid)
 {
 	Job* tmp;
@@ -104,6 +107,8 @@ void addJob(pid_t pid)
 		fprintf(stderr,"%d ",t->pid);
 	fprintf(stderr,"\n");
 }
+//从一个作业中删除某进程
+//返回所属进程组号,如果返回后该作业被撤销，返回进程组号的相反数
 pid_t rmJob(pid_t pid)
 {
 	Job* tmp;
@@ -150,6 +155,7 @@ pid_t rmJob(pid_t pid)
 	return tmp->pgid;
 
 }
+//------------以下函数似乎并没有用上-------------------
 Job* findJobId(int jid){
 	Job* tmp = list;
 	while(tmp && --jid)

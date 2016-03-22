@@ -94,7 +94,8 @@ void release(){
 /*******************************************************
                   信号以及jobs相关
 ********************************************************/
-
+//函数用于接受到子进程 结束、停止、继续 所发给父进程的信号
+//但是这个信号实际上不一定能够接收得到
 void sg_chld(int sig, siginfo_t *sip, void* noused){
 	pid_t pid;
 	pid_t p = 0;
@@ -111,24 +112,26 @@ void sg_chld(int sig, siginfo_t *sip, void* noused){
 	switch(sip->si_code){
 		case CLD_EXITED:
 		case CLD_KILLED:
-		case CLD_DUMPED:
+		case CLD_DUMPED:		//子进程结束
 
-			while((p = waitpid(-1,NULL,WNOHANG))>0){
-				pid_t t = rmJob(p);
-				if(t<0 && !(fgPid+t)){
+			while((p = waitpid(-1,NULL,WNOHANG))>0){	//回收僵尸进程，并从作业链表移除
+				pid_t t = rmJob(p);						
+				if(t<0 && !(fgPid+t)){					//如果移除导致撤销了前台作业，shell调回前台
 					fgPid = 0;
 					tcsetpgrp(STDIN_FILENO,getpid());
 				}
 			}
 			return;
-		case CLD_CONTINUED:
-			while(fgPid){
-				sigsuspend(&sset);
+		case CLD_CONTINUED:					//子进程继续运行
+			while(fgPid){					//fgPid如果有值，则是在fg_exe中赋值，此时阻塞shell进程
+				sigsuspend(&sset);			
 			}
 			return;
 		case CLD_STOPPED:
-			fgPid = 0;
-			tcsetpgrp(STDIN_FILENO,getpid());
+			if(getpgid(pid) == fgPid){		//停止的子进程如果是前台组，将shell调到前台
+				fgPid = 0;
+				tcsetpgrp(STDIN_FILENO,getpid());	
+			}
 			break;
 		default:
 			fprintf(stderr,"What condition!!!\n");
@@ -150,26 +153,20 @@ void fg_exec(int jid){
 	now = findJobId(jid);
 	if(!now)
         printf("作业号为 %d 的作业不存在！\n",jid);
-	
-    
     
 	fgPid = getJobpgid(now);
 	tcsetpgrp(STDIN_FILENO,fgPid);
 	killpg(fgPid,SIGCONT);
-	while(fgPid)
+	while(fgPid)			//阻塞
 		sigsuspend(&sset);
 	fprintf(stderr,"out fg\n");
 }
 
 /*bg命令*/
 void bg_exec(int pid){
-    Job *now = NULL;
-    
-    //SIGCHLD信号产生自此函数
-    
 	fgPid = 0;
 
-    kill(getpgid(pid), SIGCONT); //向对象作业发送SIGCONT信号，使其运行
+    killpg(getpgid(pid), SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 }
 
 /*******************************************************

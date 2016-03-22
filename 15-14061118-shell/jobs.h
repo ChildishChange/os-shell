@@ -8,7 +8,7 @@ typedef struct listInt *plistInt;
 typedef struct listInt listInt;
 typedef struct Job {
         plistInt pids;          //进程号
-		pid_t pgid;
+		pid_t pgid;			//作业进程组号
         char cmd[100];    //命令名
         const char* state;   //作业状态
         struct Job *next; //下一节点指针
