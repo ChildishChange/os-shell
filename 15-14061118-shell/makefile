@@ -1,4 +1,4 @@
-user-sh : bison.o execute.o
+user-sh : bison.o execute.o jobs.o
 	$(CC) $(CFLAGS) -o $@ $^
 clean :
 	rm *.o  user-sh
