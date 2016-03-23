@@ -1228,14 +1228,14 @@ yyreduce:
                             {
                                 mcmd->argc = len;
                                 mcmd->args = (char**)malloc(sizeof(char*)*len);
-                                mcmd->args[len] = NULL;
+                                //mcmd->args[len] = NULL;
                                 for (argcv = mcmd->ac;argcv!=NULL;argcv = argcv->next)
                                 {
                                     mcmd->args[--len] = strdup(argcv->s);
                                 }
                             }
                         }
-                        //mEcho((SimpleCmd*)$$);
+                        mEcho((SimpleCmd*)(yyval));
                         execSimpleCmd((SimpleCmd*)(yyval));
                         commandDone = 1; 
                         return 0; 
@@ -1689,8 +1689,10 @@ int main(int argc, char** argv) {
     int i;
     char c;
 
-    init(); //初始化环境
     commandDone = 0;
+    offset = 0;
+    len = 0;
+    init(); //初始化环境
     
     printf("\n");
     printf("%s\n","/***********************************************************\\");

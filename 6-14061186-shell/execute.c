@@ -877,11 +877,11 @@ void execSimpleCmd(SimpleCmd *cmd){
     }
     
     //释放结构体空间
-    for(i = 0; i < cmd->argc; ++i){
-        free(cmd->args[i]);
-    }
-    free(cmd->input);
-    free(cmd->output);
+    // for(i = 0; i < cmd->argc; ++i){
+    //     free(cmd->args[i]);
+    // }
+    // if (cmd->input!=NULL) free(cmd->input);
+    // if (cmd->input!=NULL) free(cmd->output);
 }
 
 /*******************************************************
