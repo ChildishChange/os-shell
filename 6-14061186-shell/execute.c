@@ -302,108 +302,108 @@ void stopPipe()
     }
 }
 
-/*实现管道v1*/
-void doPipe1(SimpleCmd *cmd)
-{
-    pid_t pid;
-    int fd[2], pipeIn, pipeOut;
-    char ps[1]="";
+// /*实现管道v1*/
+// void doPipe1(SimpleCmd *cmd)
+// {
+//     pid_t pid;
+//     int fd[2], pipeIn, pipeOut;
+//     char ps[1]="";
 
-    struct sigaction action;
-    action.sa_sigaction = dealPipeExit;
-    sigfillset(&action.sa_mask);
-    action.sa_flags = SA_SIGINFO;
-    sigaction(SIGCHLD, &action, NULL);
-    signal(SIGTSTP, old_handler1);
-    signal(SIGINT, old_handler2);
-    signal(SIGTTOU, old_handler3);    
+//     struct sigaction action;
+//     action.sa_sigaction = dealPipeExit;
+//     sigfillset(&action.sa_mask);
+//     action.sa_flags = SA_SIGINFO;
+//     sigaction(SIGCHLD, &action, NULL);
+//     signal(SIGTSTP, old_handler1);
+//     signal(SIGINT, old_handler2);
+//     signal(SIGTTOU, old_handler3);    
 
-    SimpleCmd* p=cmd;
-    while (p!=NULL)
-    {
-        if (p->next!=NULL&&(p->output!=NULL||p->next->input!=NULL)) 
-        {
-            printf("%s\n", "管道定义重复");
-            exit(0);
-        }
-        if (!exists(p->args[0])) {
-            printf("找不到命令 %s\n", p->args[0]);
-            exit(0);
-        }
-        if (p->next!=NULL)
-        {
-            p->output=ps;
-            p->next->input=ps;
-        }
-        p=p->next;
-    }
+//     SimpleCmd* p=cmd;
+//     while (p!=NULL)
+//     {
+//         if (p->next!=NULL&&(p->output!=NULL||p->next->input!=NULL)) 
+//         {
+//             printf("%s\n", "管道定义重复");
+//             exit(0);
+//         }
+//         if (!exists(p->args[0])) {
+//             printf("找不到命令 %s\n", p->args[0]);
+//             exit(0);
+//         }
+//         if (p->next!=NULL)
+//         {
+//             p->output=ps;
+//             p->next->input=ps;
+//         }
+//         p=p->next;
+//     }
     
-    p=cmd;
-    if (pipe(fd)==-1)
-    {
-        printf("%s\n", "create pipe failed.");
-        exit(0);
-    }
-    else printf("FD0: %d  FD1: %d\n",fd[0],fd[1]);
+//     p=cmd;
+//     if (pipe(fd)==-1)
+//     {
+//         printf("%s\n", "create pipe failed.");
+//         exit(0);
+//     }
+//     else printf("FD0: %d  FD1: %d\n",fd[0],fd[1]);
 
-    while (p!=NULL)
-    {
-            pid=fork();
+//     while (p!=NULL)
+//     {
+//             pid=fork();
 
-            if (pid>0)
-            {
-                printf("%s%d\n","parent waiting child ",pid);
-                waitpid(pid,NULL,WUNTRACED);
-                printf("%s%d is back.\n","child ",pid);
-            }
-            else break;
-            p=p->next;
-    }
-    if (pid>0) exit(0);
-    if (p->input!=NULL)
-    {
-        if (strlen(p->input)>0)
-        {
-            if((pipeIn = open(p->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
-                printf("不能打开文件 %s！\n", p->input);
-                exit(0);
-            }
-        }
-        else
-        {
-            pipeIn=fd[0];           
-        }
-    }else pipeIn=0;
-    if (p->output!=NULL)
-    {
-        if (strlen(p->output)>0)
-        {
-            if((pipeOut = open(p->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
-                printf("不能打开文件 %s！\n", p->output);
-                exit(0);
-            }
-        }
-        else
-        {
-            pipeOut=fd[1];          
-        }
-    }else pipeOut=1;
-        printf("child %d : IN: %d, OUT: %d \n",getpid(),pipeIn,pipeOut);
-            if(dup2(pipeIn, 0) == -1){
-                printf("重定向标准输入错误！\n");
-                exit(0);
-            }
-            if(dup2(pipeOut, 1) == -1){
-                printf("重定向标准输出错误！\n");
-                exit(0);
-            }
-        if (!exists(p->args[0])) exit(0);
-        justArgs(p->args[0]);            
-        if(execv(cmdBuff, p->args) < 0){ //执行命令
-            printf("execv failed!\n");
-            exit(0);
-        }       
-}
+//             if (pid>0)
+//             {
+//                 printf("%s%d\n","parent waiting child ",pid);
+//                 waitpid(pid,NULL,WUNTRACED);
+//                 printf("%s%d is back.\n","child ",pid);
+//             }
+//             else break;
+//             p=p->next;
+//     }
+//     if (pid>0) exit(0);
+//     if (p->input!=NULL)
+//     {
+//         if (strlen(p->input)>0)
+//         {
+//             if((pipeIn = open(p->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
+//                 printf("不能打开文件 %s！\n", p->input);
+//                 exit(0);
+//             }
+//         }
+//         else
+//         {
+//             pipeIn=fd[0];           
+//         }
+//     }else pipeIn=0;
+//     if (p->output!=NULL)
+//     {
+//         if (strlen(p->output)>0)
+//         {
+//             if((pipeOut = open(p->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
+//                 printf("不能打开文件 %s！\n", p->output);
+//                 exit(0);
+//             }
+//         }
+//         else
+//         {
+//             pipeOut=fd[1];          
+//         }
+//     }else pipeOut=1;
+//         printf("child %d : IN: %d, OUT: %d \n",getpid(),pipeIn,pipeOut);
+//             if(dup2(pipeIn, 0) == -1){
+//                 printf("重定向标准输入错误！\n");
+//                 exit(0);
+//             }
+//             if(dup2(pipeOut, 1) == -1){
+//                 printf("重定向标准输出错误！\n");
+//                 exit(0);
+//             }
+//         if (!exists(p->args[0])) exit(0);
+//         justArgs(p->args[0]);            
+//         if(execv(cmdBuff, p->args) < 0){ //执行命令
+//             printf("execv failed!\n");
+//             exit(0);
+//         }       
+// }
 
 /*增加管道任务*/
 pTask* addpTask(pTask* g, int rp, int wp, pid_t pid)
@@ -710,160 +710,7 @@ void init(){
 /*******************************************************
                       命令解析
 ********************************************************/
-SimpleCmd* handleSimpleCmdStr(int begin, int end){
-    int i, j, k;
-    int fileFinished, usePipe; //记录命令是否解析完毕
-    char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
-    SimpleCmd *cmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
-    
-	//默认为非后台命令，输入输出重定向为null
-    cmd->isBack = 0;
-    cmd->input = cmd->output = NULL;
-    cmd->next=NULL;
-    
-    //初始化相应变量
-    for(i = begin; i<10; i++){
-        buff[i][0] = '\0';
-    }
-    inputFile[0] = '\0';
-    outputFile[0] = '\0';
-    
-    i = begin;
-	//跳过空格等无用信息
-    while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
-        i++;
-    }
-    
-    k = 0;
-    j = 0;
-    fileFinished = 0;
-    usePipe = 0;
-    temp = buff[k]; //以下通过temp指针的移动实现对buff[i]的顺次赋值过程
-    while(i < end){
-		/*根据命令字符的不同情况进行不同的处理*/
-        switch(inputBuff[i]){ 
-            case '|':
-            case ' ':
-            case '\t': //命令名及参数的结束标志
-                temp[j] = '\0';
-                j = 0;
-                if (i-1<0||inputBuff[i]!='|'||(inputBuff[i-1]!=' '&&inputBuff[i-1]!='\t'))
-                if(!fileFinished){
-                    k++;
-                    temp = buff[k];
-                }
-                if (inputBuff[i]=='|') 
-                {
-                    usePipe = i + 1;
-                    break;
-                }
-                break;
-
-            case '<': //输入重定向标志
-                if(j != 0){
-		    //此判断为防止命令直接挨着<符号导致判断为同一个参数，如果ls<sth
-                    temp[j] = '\0';
-                    j = 0;
-                    if(!fileFinished){
-                        k++;
-                        temp = buff[k];
-                    }
-                }
-                temp = inputFile;
-                fileFinished = 1;
-                i++;
-                break;
-                
-            case '>': //输出重定向标志
-                if(j != 0){
-                    temp[j] = '\0';
-                    j = 0;
-                    if(!fileFinished){
-                        k++;
-                        temp = buff[k];
-                    }
-                }
-                temp = outputFile;
-                fileFinished = 1;
-                i++;
-                break;
-                
-            case '&': //后台运行标志
-                if(j != 0){
-                    temp[j] = '\0';
-                    j = 0;
-                    if(!fileFinished){
-                        k++;
-                        temp = buff[k];
-                    }
-                }
-                cmd->isBack = 1;
-                fileFinished = 1;
-                i++;
-                break;
-                
-            default: //默认则读入到temp指定的空间
-                temp[j++] = inputBuff[i++];
-                continue;
-		}
-        if (usePipe) break;
-        
-		//跳过空格等无用信息
-        while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
-            i++;
-        }
-	}
-    
-    if(!usePipe&&inputBuff[end-1] != ' ' && inputBuff[end-1] != '\t' && inputBuff[end-1] != '&'){
-        temp[j] = '\0';
-        if(!fileFinished){
-            k++;
-        }
-    }
-    
-	//依次为命令名及其各个参数赋值
-    cmd->args = (char**)malloc(sizeof(char*) * (k + 1));
-    cmd->args[k] = NULL;
-    for(i = 0; i<k; i++){
-        j = strlen(buff[i]);
-        cmd->args[i] = (char*)malloc(sizeof(char) * (j + 1));   
-        strcpy(cmd->args[i], buff[i]);
-    }
-    
-	//如果有输入重定向文件，则为命令的输入重定向变量赋值
-    if(strlen(inputFile) != 0){
-        j = strlen(inputFile);
-        cmd->input = (char*)malloc(sizeof(char) * (j + 1));
-        strcpy(cmd->input, inputFile);
-    }
-
-    //如果有输出重定向文件，则为命令的输出重定向变量赋值
-    if(strlen(outputFile) != 0){
-        j = strlen(outputFile);
-        cmd->output = (char*)malloc(sizeof(char) * (j + 1));   
-        strcpy(cmd->output, outputFile);
-    }
-
-    #ifdef DEBUG
- //    printf("****\n");
- //    printf("%s\n",(cmd->isBack)?"Background task running.":"Foreground task running.");
- //    	for(i = 0; cmd->args[i] != NULL; i++){
- //    		printf("args[%d]: %s\n",i,cmd->args[i]);
-	// }
- //    printf("input: %s\n",cmd->input);
- //    printf("output: %s\n",cmd->output);
- //    printf("****\n");
-    #endif
-
-    if (usePipe) 
-    {
-        cmd->next = handleSimpleCmdStr(usePipe,end);
-        cmd->isBack = cmd->next->isBack = 0;
-    }
-
-    return cmd;
-}
-
+//这里的任务转移到YACC进行
 /*******************************************************
                       命令执行
 ********************************************************/
@@ -1040,7 +887,8 @@ void execSimpleCmd(SimpleCmd *cmd){
 /*******************************************************
                      命令执行接口
 ********************************************************/
-void execute(){
-    SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-    execSimpleCmd(cmd);
-}
+// void execute(){
+//     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
+//     execSimpleCmd(cmd);
+// }
+//不再需要
