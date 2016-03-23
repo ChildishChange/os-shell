@@ -13,10 +13,17 @@
 %}
 
 %token STRING
+%token SP
 
 %%
-line            :   '\n' {return 0;}
+line            :   '\n' { lineIgnore = 0; mcmd = NULL; return 0;}
                     |command '\n'   {
+                        if (lineIgnore) 
+                        {
+                            mcmd = NULL;
+                            lineIgnore = 0;
+                            return 0;
+                        }
                         $$ = $1;
                         if ($$==NULL) return 0; 
                         //printf("line:%d\n",$$);
@@ -39,8 +46,7 @@ line            :   '\n' {return 0;}
                             }
                         }
                         mEcho((SimpleCmd*)$$);
-                        execSimpleCmd((SimpleCmd*)$$);
-                        commandDone = 1; 
+                        mcmd = (SimpleCmd*)$$;
                         return 0; 
                     }
 ;
@@ -122,6 +128,7 @@ args            :   STRING     {
                         mcmd->output = NULL;
                         mcmd->next = NULL;
                         mcmd->ac = NULL;
+                        mcmd->cmd = $1;
                         $$ = mcmd;
                         //printf("args:%d\n",$$);
                         mcmd = (SimpleCmd*)$$;
@@ -148,38 +155,17 @@ args            :   STRING     {
                         else $$ = $1;
                         //printf("args:%d\n",$$);
                         mcmd = (SimpleCmd*)$$;
-                        argcv = (argC*)malloc(sizeof(argC));
-                        argcv->next = mcmd->ac;                            
-                        argcv->s = strdup($2);
-                        mcmd->ac = argcv;
+                        //argcv = (argC*)malloc(sizeof(argC));
+                        //argcv->next = mcmd->ac;                            
+                        //argcv->s = strdup($2);
+                        //mcmd->ac = argcv;
+                        extendArgs(mcmd,$2);
                     }
 ;
 
 %%
 
 
-SimpleCmd* mEcho(SimpleCmd* head)
-{
-    SimpleCmd* p = head;
-    SimpleCmd* tmp;
-    int i=0,j;
-    for (;p!=NULL;p=p->next)
-    {
-        printf("%d: %d\n",++i,p->argc);
-        for (j=0;j<p->argc;++j)
-        {
-            printf("%s ",p->args[j]);
-        }
-        printf("\nInput: %s\nOutput: %s\n",p->input,p->output);
-        if (p->args[p->argc]!=NULL) 
-        {
-//            printf("overflow:\n");
-//            printf("%s.\n",p->args[p->argc]);
-            p->args[p->argc] = NULL;
-        }
-    }
-    return NULL;
-}
 
 /****************************************************************
                   词法分析函数
@@ -192,6 +178,8 @@ SimpleCmd* mEcho(SimpleCmd* head)
 ****************************************************************/
 void yyerror()
 {
+    errFlag=1;
+    if (lineIgnore) return;
     printf("你输入的命令不正确，请重新输入！\n");
 }
 
@@ -205,6 +193,8 @@ int main(int argc, char** argv) {
     commandDone = 0;
     offset = 0;
     len = 0;
+    errFlag = 0;
+    lineIgnore = 0;
     init(); //初始化环境
     
     printf("\n");
@@ -227,10 +217,16 @@ int main(int argc, char** argv) {
         if (argcv!=NULL) free(argcv);
         argcv = NULL;
   
+        if (errFlag) lineIgnore = 1;
+        errFlag=0;
+
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
 
-        if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息
-            commandDone = 0;
+        //printf("%d %d\n",errFlag,lineIgnore);
+
+        if (!errFlag&&mcmd!=NULL)
+        {
+            execSimpleCmd(mcmd);
             addHistory(inputBuff);
         }
         

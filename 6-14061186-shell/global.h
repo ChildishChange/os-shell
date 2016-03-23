@@ -27,6 +27,7 @@ extern "C" {
         char **args;    // 命令及参数
         char *input;    // 输入重定向
         char *output;   // 输出重定向
+        char *cmd;   // command
         struct SimpleCmd* next;
         argC *ac;
     } SimpleCmd;
@@ -51,6 +52,7 @@ extern "C" {
     } pTask;
     
     char *inputBuff;  //存放输入的命令
+    int errFlag,lineIgnore;
     
     void init();
     void addHistory(char *history);

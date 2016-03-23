@@ -61,7 +61,7 @@
 				};
 
 [\n\|<>&]				return *yytext;
-[\t ]				;
+[\t ]+				;
 .                   yyerror();	
 
 %%

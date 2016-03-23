@@ -45,7 +45,8 @@ extern int yydebug;
 # define YYTOKENTYPE
   enum yytokentype
   {
-    STRING = 258
+    STRING = 258,
+    SP = 259
   };
 #endif
 

@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <stddef.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -37,6 +38,7 @@ void printLine()
     //char hostname[]="local";
     int hn_len=32;
 
+    if (errFlag) return;
     gethostname(hostname,hn_len);
 
     printf("\nE!%s@%s:%s$ ", pwd->pw_name, hostname, get_current_dir_name()); //打印提示符信息    
@@ -273,7 +275,7 @@ void dealPipeExit(int sig, siginfo_t *sip, void* noused)
         }
     }
     ++ii;
-    //printf("%d: %d\n", ii, status);
+    //printf("[%d]: %d %d\n", pid, ii, status);
 }
 
 /*处理管道程序恢复*/
@@ -301,109 +303,6 @@ void stopPipe()
         }
     }
 }
-
-// /*实现管道v1*/
-// void doPipe1(SimpleCmd *cmd)
-// {
-//     pid_t pid;
-//     int fd[2], pipeIn, pipeOut;
-//     char ps[1]="";
-
-//     struct sigaction action;
-//     action.sa_sigaction = dealPipeExit;
-//     sigfillset(&action.sa_mask);
-//     action.sa_flags = SA_SIGINFO;
-//     sigaction(SIGCHLD, &action, NULL);
-//     signal(SIGTSTP, old_handler1);
-//     signal(SIGINT, old_handler2);
-//     signal(SIGTTOU, old_handler3);    
-
-//     SimpleCmd* p=cmd;
-//     while (p!=NULL)
-//     {
-//         if (p->next!=NULL&&(p->output!=NULL||p->next->input!=NULL)) 
-//         {
-//             printf("%s\n", "管道定义重复");
-//             exit(0);
-//         }
-//         if (!exists(p->args[0])) {
-//             printf("找不到命令 %s\n", p->args[0]);
-//             exit(0);
-//         }
-//         if (p->next!=NULL)
-//         {
-//             p->output=ps;
-//             p->next->input=ps;
-//         }
-//         p=p->next;
-//     }
-    
-//     p=cmd;
-//     if (pipe(fd)==-1)
-//     {
-//         printf("%s\n", "create pipe failed.");
-//         exit(0);
-//     }
-//     else printf("FD0: %d  FD1: %d\n",fd[0],fd[1]);
-
-//     while (p!=NULL)
-//     {
-//             pid=fork();
-
-//             if (pid>0)
-//             {
-//                 printf("%s%d\n","parent waiting child ",pid);
-//                 waitpid(pid,NULL,WUNTRACED);
-//                 printf("%s%d is back.\n","child ",pid);
-//             }
-//             else break;
-//             p=p->next;
-//     }
-//     if (pid>0) exit(0);
-//     if (p->input!=NULL)
-//     {
-//         if (strlen(p->input)>0)
-//         {
-//             if((pipeIn = open(p->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
-//                 printf("不能打开文件 %s！\n", p->input);
-//                 exit(0);
-//             }
-//         }
-//         else
-//         {
-//             pipeIn=fd[0];           
-//         }
-//     }else pipeIn=0;
-//     if (p->output!=NULL)
-//     {
-//         if (strlen(p->output)>0)
-//         {
-//             if((pipeOut = open(p->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
-//                 printf("不能打开文件 %s！\n", p->output);
-//                 exit(0);
-//             }
-//         }
-//         else
-//         {
-//             pipeOut=fd[1];          
-//         }
-//     }else pipeOut=1;
-//         printf("child %d : IN: %d, OUT: %d \n",getpid(),pipeIn,pipeOut);
-//             if(dup2(pipeIn, 0) == -1){
-//                 printf("重定向标准输入错误！\n");
-//                 exit(0);
-//             }
-//             if(dup2(pipeOut, 1) == -1){
-//                 printf("重定向标准输出错误！\n");
-//                 exit(0);
-//             }
-//         if (!exists(p->args[0])) exit(0);
-//         justArgs(p->args[0]);            
-//         if(execv(cmdBuff, p->args) < 0){ //执行命令
-//             printf("execv failed!\n");
-//             exit(0);
-//         }       
-// }
 
 /*增加管道任务*/
 pTask* addpTask(pTask* g, int rp, int wp, pid_t pid)
@@ -469,7 +368,7 @@ void doPipe(SimpleCmd *cmd)
                 printf("%s\n", "create pipe failed.");
                 exit(0);
             }
-            //else printf("FD0: %d  FD1: %d\n",fd[0],fd[1]);
+            //else printf("%s FD0: %d  FD1: %d\n",p->cmd,fd[0],fd[1]);
         }
         else {
             fd[1]=-1;
@@ -477,17 +376,20 @@ void doPipe(SimpleCmd *cmd)
             pid=fork();
             ++cnt;
             if (pid==0)
-            break;
+                break;
             else {
                 pHead=addpTask(pHead,pid,piRd,fd[1]);
+                close(ii);
+                close(fd[1]);
             }
             piRd = fd[0];
-            p=p->next;
+            ii = piRd; 
+            p = p->next;
     }
-    i=0;
+    i=ii=0;
     if (pid>0) 
     {
-        for (i=0;i<cnt*2+3;++i) close(i);
+        //for (i=3;i<cnt*2+3;++i) close(i);
         while (ii<cnt)
         {
         }
@@ -522,8 +424,8 @@ void doPipe(SimpleCmd *cmd)
             pipeOut=fd[1];          
         }
     }else pipeOut=1;
-        //printf("child %d : IN: %d, OUT: %d \n",getpid(),pipeIn,pipeOut);
-        //printf("%d %s %d %d\n", getpid(), p->args[0], pipeIn, pipeOut);
+//        printf("%d %s %d %d %d IN: %s, OUT: %s \n", getpid(), p->args[0], p->argc, pipeIn, pipeOut,p->input, p->output);
+//        if (p->args[p->argc]!=NULL) printf("overflow\n");
             if(dup2(pipeIn, 0) == -1){
                 printf("重定向标准输入错误！\n");
                 exit(0);
@@ -532,10 +434,6 @@ void doPipe(SimpleCmd *cmd)
                 printf("重定向标准输出错误！\n");
                 exit(0);
             }
-            for (i=3;i<=3+cnt*2;++i) 
-                {
-                    close(i);
-                }
             if (pipeIn!=0) close(pipeIn); 
             if (pipeOut!=1) close(pipeOut); 
         if (!exists(p->args[0])) 
@@ -577,8 +475,6 @@ void fg_exec(int pid){
     fgPid = now->pid;
     strcpy(now->state, RUNNING);
     
-    signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
-    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
   //   i = strlen(now->cmd) - 1;
   //   while(i >= 0 && now->cmd[i] != '&')
 		// i--;
@@ -882,6 +778,147 @@ void execSimpleCmd(SimpleCmd *cmd){
     // }
     // if (cmd->input!=NULL) free(cmd->input);
     // if (cmd->input!=NULL) free(cmd->output);
+}
+
+/*******************************************************
+                     通配符匹配
+********************************************************/
+int pMatch(char* x, char* st, int x_begin, int st_begin)
+{
+    int len1 = strlen(x), lens = strlen(st);
+    int i = x_begin,j = st_begin,k;
+#ifdef ISDEBUG
+    printf("matching %s and %s:\n",x + x_begin, st + st_begin);
+#endif
+    while (i < len1 && j < lens)
+    {
+        if (st[j]=='*')
+            while (j + 1< lens&&st[j + 1]=='*') ++j;
+#ifdef ISDEBUG
+        printf("matching %c and %c: ",x[i],st[j]);
+#endif
+        if (st[j]!='*'&&st[j]!=x[i]) 
+        {
+#ifdef ISDEBUG
+            printf("not match\n");
+#endif
+            return 0;
+        }
+        if (st[j]=='*'&&j==lens - 1) 
+        {
+#ifdef ISDEBUG
+            printf("success.\n");
+#endif
+            return 1;
+        }
+        if (st[j]==x[i]&&st[j]!='*')
+        {
+#ifdef ISDEBUG
+            printf("matched.\n");
+#endif
+            ++i;
+            ++j;
+            continue;
+        }
+        for (k = i;k < len1;++k)
+        {
+            if (x[k]==st[j + 1]) 
+            {
+                if (pMatch(x,st,k + 1, j + 2)) return 1;
+            }
+        }
+#ifdef ISDEBUG
+        printf("failed.\n");        
+#endif
+        return 0;
+    }
+    if (j < lens&&st[j]=='*')
+        while (j + 1< lens&&st[j + 1]=='*') ++j;
+    if (j==lens&&i==len1||j==lens - 1&&st[j]=='*') 
+    {
+#ifdef ISDEBUG
+        printf("success.\n");
+#endif
+        return 1; 
+    }
+    else 
+    {
+#ifdef ISDEBUG
+        printf("failed.\n");
+#endif
+        return 0;
+    }
+}
+/*******************************************************
+                     通配符扩展参数
+********************************************************/
+void extendArgs(SimpleCmd* head, char * s)
+{
+    DIR* dir;
+    struct dirent *ptr;
+    argC *ag;
+    int flag=1, i, len;
+    len = strlen(s);
+    for (i = 0;i < len; ++i)
+    {
+        if (s[i]=='*')
+        {
+            flag = 0;
+            break;
+        }
+    }
+    if (flag || (dir = opendir(get_current_dir_name()))==NULL) 
+    {
+        ag = (argC*)malloc(sizeof(argC));
+        ag->s = s;
+        ag->next = head->ac;
+        head->ac = ag;
+        return;
+    }
+    flag = 1;
+    for (ptr = readdir(dir);ptr!=NULL;ptr = readdir(dir))
+    {
+        if (s[0]!='.'&&(ptr->d_name[0]=='.')) continue;
+        if (strcmp(head->cmd,"cd")==0&&ptr->d_type!=4) continue;
+        if (pMatch(ptr->d_name,s,0,0))
+        {
+            flag = 0;
+            ag = (argC*)malloc(sizeof(argC));
+            ag->s = strdup(ptr->d_name);
+            ag->next = head->ac;
+            head->ac = ag;
+        }
+    }
+    if (flag)
+    {
+        ag = (argC*)malloc(sizeof(argC));
+        ag->s = s;
+        ag->next = head->ac;
+        head->ac = ag;
+    }
+}
+
+/*******************************************************
+                     调整&调试
+********************************************************/
+SimpleCmd* mEcho(SimpleCmd* head)
+{
+    SimpleCmd* p = head;
+    SimpleCmd* tmp;
+    int i=0,j;
+    for (;p!=NULL;p=p->next)
+    {
+        //printf("%d: %d\n",++i,p->argc);
+        //for (j=0;j<p->argc;++j) { printf("%s ",p->args[j]); }
+        //printf("\nInput: %s\nOutput: %s\n",p->input,p->output);
+        if (p->args[p->argc]!=NULL) 
+        {
+//            printf("overflow:\n");
+//            printf("%s.\n",p->args[p->argc]);
+            p->args[p->argc] = NULL;
+        }
+    }
+    return NULL;
 }
 
 /*******************************************************
