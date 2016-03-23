@@ -68,15 +68,10 @@
 
     int yylex ();
     void yyerror ();
-    SimpleCmd* mEcho(SimpleCmd* head);
-
-    SimpleCmd * mcmd;
-    argC * argcv;
       
     int offset, len, commandDone;
 
-
-#line 80 "bison.tab.c" /* yacc.c:339  */
+#line 75 "bison.tab.c" /* yacc.c:339  */
 
 # ifndef YY_NULLPTR
 #  if defined __cplusplus && 201103L <= __cplusplus
@@ -94,10 +89,7 @@
 # define YYERROR_VERBOSE 0
 #endif
 
-/* In a future release of Bison, this section will be replaced
-   by #include "bison.tab.h".  */
-#ifndef YY_YY_BISON_TAB_H_INCLUDED
-# define YY_YY_BISON_TAB_H_INCLUDED
+
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -127,11 +119,11 @@ extern YYSTYPE yylval;
 
 int yyparse (void);
 
-#endif /* !YY_YY_BISON_TAB_H_INCLUDED  */
+
 
 /* Copy the second part of user declarations.  */
 
-#line 135 "bison.tab.c" /* yacc.c:358  */
+#line 127 "bison.tab.c" /* yacc.c:358  */
 
 #ifdef short
 # undef short
@@ -371,18 +363,18 @@ union yyalloc
 #endif /* !YYCOPY_NEEDED */
 
 /* YYFINAL -- State number of the termination state.  */
-#define YYFINAL  10
+#define YYFINAL  8
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   15
+#define YYLAST   9
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  9
+#define YYNTOKENS  7
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  10
+#define YYNNTS  9
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  18
+#define YYNRULES  14
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  25
+#define YYNSTATES  17
 
 /* YYTRANSLATE[YYX] -- Symbol number corresponding to YYX as returned
    by yylex, with out-of-bounds checking.  */
@@ -397,18 +389,18 @@ union yyalloc
 static const yytype_uint8 yytranslate[] =
 {
        0,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       4,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     5,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       7,     2,     8,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     4,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       5,     2,     6,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     6,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -428,8 +420,8 @@ static const yytype_uint8 yytranslate[] =
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    18,    18,    19,    48,    52,    58,    59,    66,    71,
-      78,    79,    86,    97,   100,   107,   110,   117,   133
+       0,    13,    13,    14,    17,    18,    21,    24,    27,    30,
+      31,    34,    35,    38,    39
 };
 #endif
 
@@ -438,9 +430,9 @@ static const yytype_uint8 yyrline[] =
    First, the terminals, then, starting at YYNTOKENS, nonterminals.  */
 static const char *const yytname[] =
 {
-  "$end", "error", "$undefined", "STRING", "'\\n'", "'&'", "'|'", "'<'",
-  "'>'", "$accept", "line", "command", "fbpCommand", "pCommand",
-  "fbCommand", "simpleCmd", "inputRedirect", "outputRedirect", "args", YY_NULLPTR
+  "$end", "error", "$undefined", "STRING", "'&'", "'<'", "'>'", "$accept",
+  "line", "command", "fgCommand", "simpleCmd", "progInvocation",
+  "inputRedirect", "outputRedirect", "args", YY_NULLPTR
 };
 #endif
 
@@ -449,14 +441,14 @@ static const char *const yytname[] =
    (internal) symbol number NUM (which must be that of a token).  */
 static const yytype_uint16 yytoknum[] =
 {
-       0,   256,   257,   258,    10,    38,   124,    60,    62
+       0,   256,   257,   258,    38,    60,    62
 };
 # endif
 
-#define YYPACT_NINF -13
+#define YYPACT_NINF -4
 
 #define yypact_value_is_default(Yystate) \
-  (!!((Yystate) == (-13)))
+  (!!((Yystate) == (-4)))
 
 #define YYTABLE_NINF -1
 
@@ -467,9 +459,8 @@ static const yytype_uint16 yytoknum[] =
      STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-       2,   -13,   -13,     7,    -2,   -13,     3,   -13,     5,    -3,
-     -13,   -13,   -13,     9,   -13,     9,   -13,    10,     6,   -13,
-     -13,   -13,    12,   -13,   -13
+      -3,    -4,     1,    -4,    -2,    -4,    -1,     0,    -4,    -4,
+       2,     3,    -4,    -4,     4,    -4,    -4
 };
 
   /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -477,21 +468,20 @@ static const yytype_int8 yypact[] =
      means the default is an error.  */
 static const yytype_uint8 yydefact[] =
 {
-       0,    17,     2,     0,     0,     4,     6,     5,    10,    13,
-       1,     3,     7,     0,    11,     0,    18,     0,    15,     8,
-       9,    14,     0,    12,    16
+       2,    13,     0,     3,     4,     6,     9,     8,     1,     5,
+       0,    11,    14,    10,     0,     7,    12
 };
 
   /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -13,   -13,   -13,   -13,   -13,   -13,   -12,   -13,   -13,   -13
+      -4,    -4,    -4,    -4,    -4,    -4,    -4,    -4,    -4
 };
 
   /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-      -1,     3,     4,     5,     6,     7,     8,    18,    23,     9
+      -1,     2,     3,     4,     5,     6,    11,    15,     7
 };
 
   /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -499,37 +489,34 @@ static const yytype_int8 yydefgoto[] =
      number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_uint8 yytable[] =
 {
-      16,    19,    11,    20,    17,     1,     2,    10,    12,    13,
-      14,    15,     1,    21,    22,    24
+       1,     8,     9,    12,    10,    13,     0,    16,     0,    14
 };
 
-static const yytype_uint8 yycheck[] =
+static const yytype_int8 yycheck[] =
 {
-       3,    13,     4,    15,     7,     3,     4,     0,     5,     6,
-       5,     6,     3,     3,     8,     3
+       3,     0,     4,     3,     5,     3,    -1,     3,    -1,     6
 };
 
   /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
      symbol of state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,     3,     4,    10,    11,    12,    13,    14,    15,    18,
-       0,     4,     5,     6,     5,     6,     3,     7,    16,    15,
-      15,     3,     8,    17,     3
+       0,     3,     8,     9,    10,    11,    12,    15,     0,     4,
+       5,    13,     3,     3,     6,    14,     3
 };
 
   /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
 static const yytype_uint8 yyr1[] =
 {
-       0,     9,    10,    10,    11,    11,    12,    12,    13,    13,
-      14,    14,    15,    16,    16,    17,    17,    18,    18
+       0,     7,     8,     8,     9,     9,    10,    11,    12,    13,
+      13,    14,    14,    15,    15
 };
 
   /* YYR2[YYN] -- Number of symbols on the right hand side of rule YYN.  */
 static const yytype_uint8 yyr2[] =
 {
-       0,     2,     1,     2,     1,     1,     1,     2,     3,     3,
-       1,     2,     3,     0,     2,     0,     2,     1,     2
+       0,     2,     0,     1,     1,     2,     1,     3,     2,     0,
+       2,     0,     2,     0,     2
 };
 
 
@@ -1205,215 +1192,14 @@ yyreduce:
   YY_REDUCE_PRINT (yyn);
   switch (yyn)
     {
-        case 2:
-#line 18 "bison.y" /* yacc.c:1646  */
-    {return 0;}
-#line 1212 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 3:
-#line 19 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[-1]);
-                        if ((yyval)==NULL) return 0; 
-                        //printf("line:%d\n",$$);
-                        //printf("%s %s %s %s\n",mcmd->input,mcmd->output,argcv->s,argcv->next==NULL?"(null)":argcv->next->s); 
-                        //strcpy(inputBuff,$1);   
-                        //execute();  
-                        for (mcmd = (SimpleCmd*)(yyval);mcmd!=NULL;mcmd = mcmd->next)
-                        {
-                            len = 0;
-                            for (argcv = mcmd->ac;argcv!=NULL;argcv = argcv->next, ++len);
-                            if (len) 
-                            {
-                                mcmd->argc = len;
-                                mcmd->args = (char**)malloc(sizeof(char*)*len);
-                                for (argcv = mcmd->ac;argcv!=NULL;argcv = argcv->next)
-                                {
-                                    mcmd->args[--len] = strdup(argcv->s);
-                                }
-                            }
-                        }
-                        //printf("ln:%d\n",$$);
-                        mEcho((SimpleCmd*)(yyval));
-                        execSimpleCmd((SimpleCmd*)(yyval));
-                        commandDone = 1; 
-                        return 0; 
-                    }
-#line 1244 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 4:
-#line 48 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[0]);    
-                        //printf("pC:%d\n",$$);
-                    }
-#line 1253 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 5:
-#line 52 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[0]);
-                        //printf("sC:%d\n",$$);
-                    }
-#line 1262 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 6:
-#line 58 "bison.y" /* yacc.c:1646  */
-    { (yyval) = (yyvsp[0]);}
-#line 1268 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 7:
-#line 59 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[-1]);  
-                        mcmd = (SimpleCmd*)(yyval);
-                        mcmd->isBack = 1;                        
-                    }
-#line 1278 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 8:
-#line 66 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[-2]);
-                        for (mcmd = (SimpleCmd*)(yyval);mcmd->next!=NULL;mcmd = mcmd->next);
-                        mcmd->next = (yyvsp[0]);                                
-                    }
-#line 1288 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 9:
-#line 71 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[-2]);
-                        mcmd = (SimpleCmd*)(yyval);
-                        mcmd->next = (yyvsp[0]);                                                
-                    }
-#line 1298 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 10:
-#line 78 "bison.y" /* yacc.c:1646  */
-    { (yyval) = (yyvsp[0]);}
-#line 1304 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 11:
-#line 79 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[-1]);  
-                        mcmd = (SimpleCmd*)(yyval);
-                        mcmd->isBack = 1;                        
-                    }
-#line 1314 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 12:
-#line 86 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = (yyvsp[-2]);
-                        //printf("sim:%d\n",$$);
-                        //strcat($$,$2);
-                        //strcat($$,$3);
-                        mcmd = (SimpleCmd*)(yyval);
-                        mcmd->input = (yyvsp[-1]);
-                        mcmd->output = (yyvsp[0]);
-                    }
-#line 1328 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 13:
-#line 97 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = NULL;
-                    }
-#line 1336 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 14:
-#line 100 "bison.y" /* yacc.c:1646  */
-    {
-                        //$$ = strdup("<");
-                        //strcat($$,$2);
-                        (yyval) = strdup((yyvsp[0]));
-                    }
-#line 1346 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 15:
-#line 107 "bison.y" /* yacc.c:1646  */
-    {
-                        (yyval) = NULL;
-                    }
-#line 1354 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 16:
-#line 110 "bison.y" /* yacc.c:1646  */
-    {
-                        //$$ = strdup(">");
-                        //strcat($$,$2);
-                        (yyval) = strdup((yyvsp[0]));
-                    }
-#line 1364 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 17:
-#line 117 "bison.y" /* yacc.c:1646  */
-    {
-                        mcmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
-                        mcmd->isBack = 0;
-                        mcmd->argc = 0;
-                        mcmd->input = NULL;
-                        mcmd->output = NULL;
-                        mcmd->next = NULL;
-                        mcmd->ac = NULL;
-                        (yyval) = mcmd;
-                        //printf("args:%d\n",$$);
-                        mcmd = (SimpleCmd*)(yyval);
-                        argcv = (argC*)malloc(sizeof(argC));
-                        argcv->next = mcmd->ac;                            
-                        argcv->s = strdup((yyvsp[0]));
-                        mcmd->ac = argcv;
-                    }
-#line 1385 "bison.tab.c" /* yacc.c:1646  */
-    break;
-
-  case 18:
-#line 133 "bison.y" /* yacc.c:1646  */
-    {
-                        //$$ = strdup($1);
-                        //strcat($$," ");
-                        //strcat($$,$2);
-                        if ((yyvsp[-1])==NULL) 
-                        {
-                            mcmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
-                            mcmd->isBack = 0;
-                            mcmd->argc = 0;
-                            mcmd->input = NULL;
-                            mcmd->output = NULL;
-                            mcmd->next = NULL;
-                            mcmd->ac = NULL;
-                            (yyval) = mcmd;
-                        }
-                        else (yyval) = (yyvsp[-1]);
-                        //printf("args:%d\n",$$);
-                        mcmd = (SimpleCmd*)(yyval);
-                        argcv = (argC*)malloc(sizeof(argC));
-                        argcv->next = mcmd->ac;                            
-                        argcv->s = strdup((yyvsp[0]));
-                        mcmd->ac = argcv;
-                    }
-#line 1413 "bison.tab.c" /* yacc.c:1646  */
+        case 3:
+#line 14 "bison.y" /* yacc.c:1646  */
+    {   execute();  commandDone = 1;   }
+#line 1199 "bison.tab.c" /* yacc.c:1646  */
     break;
 
 
-#line 1417 "bison.tab.c" /* yacc.c:1646  */
+#line 1203 "bison.tab.c" /* yacc.c:1646  */
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -1641,37 +1427,13 @@ yyreturn:
 #endif
   return yyresult;
 }
-#line 158 "bison.y" /* yacc.c:1906  */
+#line 42 "bison.y" /* yacc.c:1906  */
 
-
-
-SimpleCmd* mEcho(SimpleCmd* head)
-{
-    SimpleCmd* p = head;
-    SimpleCmd* tmp;
-    int i=0,j;
-    for (;p!=NULL;p=p->next)
-    {
-        printf("%d: %d\n",++i,p->argc);
-        for (j=0;j<p->argc;++j)
-        {
-            printf("%s ",p->args[j]);
-        }
-        printf("\nInput: %s\nOutput: %s\n",p->input,p->output);
-        if (p->args[p->argc]!=NULL) 
-        {
-//            printf("overflow:\n");
-//            printf("%s.\n",p->args[p->argc]);
-            p->args[p->argc] = NULL;
-        }
-    }
-    return NULL;
-}
 
 /****************************************************************
                   词法分析函数
 ****************************************************************/
-int yylex_(){
+int yylex(){
     //这个函数用来检查inputBuff是否满足lex的定义，实际上并不进行任何操作，初期可略过不看
     int flag;
     char c;
@@ -1743,20 +1505,15 @@ int main(int argc, char** argv) {
 
         printLine();
 
-//        i = 0;
-//        while((c = getchar()) != '\n'){ //读入一行命令
-//            inputBuff[i++] = c;
-//        }
-//        inputBuff[i] = '\0';
+        i = 0;
+        while((c = getchar()) != '\n'){ //读入一行命令
+            inputBuff[i++] = c;
+        }
+        inputBuff[i] = '\0';
 
-//        len = i;
-//        offset = 0;
-
-        if (mcmd!=NULL) free(mcmd);
-        mcmd = NULL;
-        if (argcv!=NULL) free(argcv);
-        argcv = NULL;
-  
+        len = i;
+        offset = 0;
+        
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
 
         if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息

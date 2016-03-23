@@ -17,18 +17,12 @@ extern "C" {
     #include <pwd.h>
     #include <unistd.h>
     
-    typedef struct argsChain {
-        char *s;
-        struct argsChain* next;
-    } argC;
-    
     typedef struct SimpleCmd {
-        int isBack, argc;     // 是否后台运行
+        int isBack;     // 是否后台运行
         char **args;    // 命令及参数
         char *input;    // 输入重定向
         char *output;   // 输出重定向
         struct SimpleCmd* next;
-        argC *ac;
     } SimpleCmd;
 
     typedef struct History {
@@ -50,7 +44,7 @@ extern "C" {
         struct PipeTask* next;
     } pTask;
     
-    char *inputBuff;  //存放输入的命令
+    char inputBuff[100];  //存放输入的命令
     
     void init();
     void addHistory(char *history);

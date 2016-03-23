@@ -27,9 +27,23 @@ void mes()
 
 int main()
 {
-	int n;
-	scanf("%d",&n);
-	--n;
-	while (n-->0) printf("%d\n",n);
+	int i=0;
+	pid=fork();
+	char *argv[4];
+	if (pid)
+	{
+		signal(SIGTSTP,ctz);
+		signal(SIGCHLD,mes);
+	}
+	else 
+	{
+		signal(SIGTSTP,ctz);
+		execv("./Demo",argv);		
+	}
+	while (i<30)
+	{
+		sleep(1);
+		++i;
+		printf(pid?"fa\n":"ch\n");
+	}
 }
-

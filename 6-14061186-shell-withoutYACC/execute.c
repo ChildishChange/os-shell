@@ -141,32 +141,10 @@ Job* addJob(pid_t pid){
     return job;
 }
 
-void doRM(pid_t pid)
-{
-    Job *now = NULL, *last = NULL;
-    now = head;
-    while(now != NULL && now->pid < pid){
-        last = now;
-        now = now->next;
-    }
-    
-    if(now == NULL){ //作业不存在，则不进行处理直接返回
-        return;
-    }
-    
-    //printf("rmJob:[%d]\n", sip->si_pid);
-    //开始移除该作业
-    if(now == head){
-        head = now->next;
-    }else{
-        last->next = now->next;
-    }
-    waitpid(pid,NULL,WUNTRACED);
-    free(now);    
-}
-
 /*移除一个作业*/
 void rmJob(int sig, siginfo_t *sip, void* noused){
+    pid_t pid;
+    Job *now = NULL, *last = NULL;
     
     //printf("status:%d code:%d |pid#%d#\n",sip->si_status, sip->si_code, sip->si_pid);
 
@@ -179,7 +157,27 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
 
     if (sip->si_status==SIGCONT||sip->si_status==SIGTSTP||sip->si_status==SIGSTOP||sip->si_status==SIGTTOU||sip->si_status==SIGTTIN) return;
     
-    doRM(sip->si_pid);
+    pid = sip->si_pid;
+
+    now = head;
+	while(now != NULL && now->pid < pid){
+		last = now;
+		now = now->next;
+	}
+    
+    if(now == NULL){ //作业不存在，则不进行处理直接返回
+        return;
+    }
+    
+    //printf("rmJob:[%d]\n", sip->si_pid);
+	//开始移除该作业
+    if(now == head){
+        head = now->next;
+    }else{
+        last->next = now->next;
+    }
+    waitpid(pid,NULL,WUNTRACED);
+    free(now);
 }
 
 /*设置后台程序读写挂起状态*/
@@ -523,7 +521,6 @@ void doPipe(SimpleCmd *cmd)
         }
     }else pipeOut=1;
         //printf("child %d : IN: %d, OUT: %d \n",getpid(),pipeIn,pipeOut);
-        //printf("%d %s %d %d\n", getpid(), p->args[0], pipeIn, pipeOut);
             if(dup2(pipeIn, 0) == -1){
                 printf("重定向标准输入错误！\n");
                 exit(0);
@@ -538,16 +535,9 @@ void doPipe(SimpleCmd *cmd)
                 }
             if (pipeIn!=0) close(pipeIn); 
             if (pipeOut!=1) close(pipeOut); 
-        if (!exists(p->args[0])) 
-        {
-            printf("不存在的命令:%s\n", p->args[0]);
-            exit(0);
-        }
-        //printf("%s\n", "here");
+        if (!exists(p->args[0])) exit(0);
         justArgs(p->args[0]);            
-        //printf("%s\n", "here");
-        //printf("exec %s %s %d %s\n", p->args[0],p->args[1],getpid(), cmdBuff);
-        if(execv(cmdBuff, p->args) < 0){ //执行命令
+        if(execvp(cmdBuff, p->args) < 0){ //执行命令
             printf("execv failed!\n");
             exit(0);
         }       
@@ -565,11 +555,6 @@ void fg_exec(int pid){
     
     if(now == NULL){ //未找到作业
         printf("pid为 %d 的作业不存在！\n", pid);
-        return;
-    }
-    if (getpgid(now->pid)<0)
-    {
-        doRM(now->pid);
         return;
     }
 
@@ -610,11 +595,6 @@ void bg_exec(int pid){
     
     if(now == NULL){ //未找到作业
         printf("pid为%d 的作业不存在！\n", pid);
-        return;
-    }
-    if (getpgid(now->pid)<0)
-    {
-        doRM(now->pid);
         return;
     }
     
@@ -874,7 +854,6 @@ void execOuterCmd(SimpleCmd *cmd){
 
     if (exists(cmd->args[0])||cmd->next!=NULL){ //命令存在
 
-
         if((pid = fork()) < 0){
             perror("fork failed");
             return;
@@ -1030,11 +1009,11 @@ void execSimpleCmd(SimpleCmd *cmd){
     }
     
     //释放结构体空间
-    for(i = 0; i < cmd->argc; ++i){
+    for(i = 0; cmd->args[i] != NULL; i++){
         free(cmd->args[i]);
+        free(cmd->input);
+        free(cmd->output);
     }
-    free(cmd->input);
-    free(cmd->output);
 }
 
 /*******************************************************
