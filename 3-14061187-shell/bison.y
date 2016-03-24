@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     int i;
     char c;
     extern FILE* yyin;
-
+	yyin = stdin;
     init(); //初始化环境
     commandDone = 0;
 
@@ -56,7 +56,11 @@ int main(int argc, char** argv) {
 
     while(1){
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
+		//sleep(1);        
+		//printf("***");
+        //while((c=getchar())!=EOF) printf("*%c*",c);
      }
 
     return (EXIT_SUCCESS);
 }
+

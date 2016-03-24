@@ -280,6 +280,7 @@ void rmJob(int pid){
     }
 
     free(now);
+	//sleep(1);
 }
 
 //
@@ -418,7 +419,7 @@ void fg_exec(int pid){
 	int i,ret;
 
     //SIGCHLD信号产生自此函数
-    ignore = 1;
+    ignore = 0;
 
 	//根据pid查找作业
     now = head;
@@ -455,7 +456,9 @@ void fg_exec(int pid){
         if (!stop_wait) wait_pipe(pipejob,WAIT);
         stop_wait = 0;
     }
-    else waitpid(now->pid,NULL,0);
+    else {
+        sigsuspend(&WAIT);
+    }
 
     tcsetpgrp(0,getpid());
 }
@@ -614,7 +617,7 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
 
     i = begin;
 	//跳过空格等无用信息
-    while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
+    while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t' || inputBuff[i] == '\n')){
         i++;
     }
 
@@ -838,12 +841,11 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                 signal(SIGUSR1, setGoon);
                 while(goon == 0) ;
                 if (dup_flg == 0 || dup_flg == 2) addJob(pid); //增加新的作业
-                perror("sttt00");
                 kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
 
                 //等待子进程输出
-                signal(SIGUSR1, setGoon);
-                while(goon == 0) ;
+                //signal(SIGUSR1, setGoon);
+                //while(goon == 0) ;
                 goon = 0;
             }else{ //非后台命令
                 if (dup_flg==0 || dup_flg==2) {
@@ -999,3 +1001,4 @@ void execute2(){
     stop_wait = 0;
     tcsetpgrp(0,getpid());
 }
+
