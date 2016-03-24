@@ -3,7 +3,7 @@
 #include "global.h"
 int offset;int flag=1;
 char c;
-#include "bison.tab.h"
+#include "bison.h"
 int i;
 #include <string.h>
  
@@ -24,7 +24,7 @@ order {char}+
  
 {spare}  {if (flag==1) return STRING;}
 {char}	{  flag=1;}
-{order} { printf("zhi ling");strcpy(inputBuff,yylex); flag=0; return STRING;
+{order} { printf("zhi ling");strcpy(inputBuff,yytext); flag=0; return STRING;
 }
 
 ['<'] { printf("xiaoyu");return '<';}
