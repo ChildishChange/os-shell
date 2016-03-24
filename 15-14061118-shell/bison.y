@@ -1,19 +1,23 @@
 %{
-    #include "global.h"
+#include "global.h"
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define YYSTYLE char*
 
 
-    //int yylex ();
+    int yylex();
     void yyerror ();
       
-    int offset, len, commandDone;
+    int  commandDone;
 %}
 
-%token STRING END
+%token STRING  END
 
 %%
-line            :   /* empty */  END		 
-                    |command  END                      {   execute();  commandDone = 1; }
+line            :   /* empty */   END		 
+                    |command   END                      { execute(); commandDone = 1; return;}
 ;
 
 command         :   fgCommand  
@@ -61,33 +65,21 @@ int main(int argc, char** argv) {
     int i;
     char c;
 
-    //init(); //初始化环境
+    init(); //初始化环境
     commandDone = 0;
     
 
     do{
         i = 0;
         printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
-	        
-	///while((c = getchar()) != '\n'){ //读入一行命令
-			//if(c == EOF)
-			//	continue;
-            //inputBuff[i++] = c;
-       // }
-
- 
-        //inputBuff[i] = '\0';
-	 
-        //len = i;
-
-        //offset = 0;
+	
+	while ((c=getchar())==-1);       
+ 	ungetc(c,stdin);
    
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
 	
-	//printf("HERE\n");
-	//printf(inputBuff);
-	//printf("\n");
-
+	printf(inputBuff);
+ 
         if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息
             commandDone = 0;
             addHistory(inputBuff);

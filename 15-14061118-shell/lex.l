@@ -1,40 +1,27 @@
 %{
-
+#include "bison.tab.h"
 #include "global.h"
-int offset;int flag=1;
-char c;
-#include "bison.h"
-int i;
 #include <string.h>
- 
- 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 %}
- 
 
- 
-spare [' '\t]
-kongge {spare}*
- 
-char[A-Za-z0-9\.\/]
+char[^ \t\n\>\<&]
 order {char}+
+space [ \t]
+
+%%
+{order}  {strcat (inputBuff,yytext); return STRING;}
+\n {return END;}
+\<  {strcat (inputBuff,yytext); return '<';}
+\>  {strcat (inputBuff,yytext); return '>';}
+&   {strcat (inputBuff,yytext); return '&';}
+{space} {strcat (inputBuff,yytext);}
 
 
 %%
-[/0]  {printf("END\n");return END;}
- 
-{spare}  {if (flag==1) return STRING;}
-{char}	{  flag=1;}
-{order} { printf("zhi ling");strcpy(inputBuff,yytext); flag=0; return STRING;
-}
 
-['<'] { printf("xiaoyu");return '<';}
-['>'] { printf("dayu"); return '>';}
-['&'] { printf("and"); return '&';}
-['|'] { printf("or"); return '|';} 
-
-
-%%
- 
 int yywrap(){
-	return 1;
+return 1;
 }
