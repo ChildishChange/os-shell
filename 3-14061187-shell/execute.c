@@ -582,6 +582,7 @@ void init(){
     signal(SIGINT , Sig_void);
     signal(SIGTTOU , Sig_void);
     signal(SIGTTIN , Sig_void);
+    signal(SIGUSR1, setGoon);
 
     sigemptyset(&WAIT);
     sigemptyset(&NONE);
@@ -796,9 +797,10 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                 close(in_filedes);
             }*/
             if(cmd->isBack){ //若是后台运行命令，等待父进程增加作业
-                //signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
-                //while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
-                //goon = 0; //置0，为下一命令做准备
+                signal(SIGUSR1, setGoon); //收到信号，setGoon函数将goon置1，以跳出下面的循环
+                kill(getppid(),SIGUSR1);
+                while(goon == 0) ; //等待父进程SIGUSR1信号，表示作业已加到链表中
+                goon = 0; //置0，为下一命令做准备
 
                 printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
                 //kill(getppid(), SIGCHLD);
@@ -830,15 +832,19 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                 }
             }
 
-            if(cmd ->isBack){ //后台命令
+            if(cmd->isBack){ //后台命令
                 fgPid = 0; //pid置0，为下一命令做准备
+                //先等待子进程发射 SIGUSR1
+                signal(SIGUSR1, setGoon);
+                while(goon == 0) ;
                 if (dup_flg == 0 || dup_flg == 2) addJob(pid); //增加新的作业
-                //kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
+                perror("sttt00");
+                kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
 
                 //等待子进程输出
-                //signal(SIGUSR1, setGoon);
-                //while(goon == 0) ;
-                //goon = 0;
+                signal(SIGUSR1, setGoon);
+                while(goon == 0) ;
+                goon = 0;
             }else{ //非后台命令
                 if (dup_flg==0 || dup_flg==2) {
                     fgPid = pid;
