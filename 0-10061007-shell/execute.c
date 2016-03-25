@@ -241,6 +241,10 @@ void bg_exec(int pid){
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 }
 
+void sig_capture() {
+	printf("Signature Capture Here!\n");
+}
+
 /*******************************************************
                     命令历史记录
 ********************************************************/
@@ -320,6 +324,7 @@ void init(){
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
     signal(SIGTSTP, ctrl_Z);
+	signal(SIGTTOU, SIG_IGN);
 }
 
 /*******************************************************
@@ -528,7 +533,9 @@ void execOuterCmd(SimpleCmd *cmd){
                 goon = 0;
             }else{ //非后台命令
                 fgPid = pid;
+				tcsetpgrp(STDIN_FILENO, fgPid);
                 waitpid(pid, NULL, 0);
+				tcsetpgrp(STDIN_FILENO, getpgrp());
             }
 		}
     }else{ //命令不存在
