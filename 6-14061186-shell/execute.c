@@ -563,8 +563,8 @@ void type_exec(char *cmd){
         printf("wait is a shell builtin");
     }
     else {
-        exists(cmd);
-        printf("%s is %s",cmd,cmdBuff);
+        if (!exists(cmd)) printf("type: %s: not found",cmd);
+        else printf("%s is %s",cmd,cmdBuff);
     }
     printf("\n");
 }
