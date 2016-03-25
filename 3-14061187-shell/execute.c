@@ -17,7 +17,7 @@
 #define DEBUG_PIPE
 sigset_t WAIT,NONE;
 int goon = 0, ignore = 0;       //用于设置signal信号量
-char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
+char *envPath[10], cmdBuff[100];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;               //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
@@ -103,6 +103,92 @@ void release(){
     }
 }
 
+void find_type(char *s){
+    int i = 0;
+    printf("type: ");
+    if (strcmp(s,"alias")==0 ||
+        strcmp(s,"bg")==0 ||
+        strcmp(s,"bind")==0 ||
+        strcmp(s,"break")==0 ||
+        strcmp(s,"builtin")==0 ||
+        strcmp(s,"caller")==0 ||
+        strcmp(s,"cd")==0 ||
+        strcmp(s,"command")==0 ||
+        strcmp(s,"compgen")==0 ||
+        strcmp(s,"complete")==0 ||
+        strcmp(s,"compopt")==0 ||
+        strcmp(s,"continue")==0 ||
+        strcmp(s,"declare")==0 ||
+        strcmp(s,"dirs")==0 ||
+        strcmp(s,"disown")==0 ||
+        strcmp(s,"echo")==0 ||
+        strcmp(s,"enable")==0 ||
+        strcmp(s,"eval")==0 ||
+        strcmp(s,"exec")==0 ||
+        strcmp(s,"exit")==0 ||
+        strcmp(s,"export")==0 ||
+        strcmp(s,"false")==0 ||
+        strcmp(s,"fc")==0 ||
+        strcmp(s,"fg")==0 ||
+        strcmp(s,"getopts")==0 ||
+        strcmp(s,"hash")==0 ||
+        strcmp(s,"help")==0 ||
+        strcmp(s,"history")==0 ||
+        strcmp(s,"jobs")==0 ||
+        strcmp(s,"kill")==0 ||
+        strcmp(s,"let")==0 ||
+        strcmp(s,"local")==0 ||
+        strcmp(s,"logout")==0 ||
+        strcmp(s,"mapfile")==0 ||
+        strcmp(s,"popd")==0 ||
+        strcmp(s,"printf")==0 ||
+        strcmp(s,"pushd")==0 ||
+        strcmp(s,"pwd")==0 ||
+        strcmp(s,"read")==0 ||
+        strcmp(s,"readarray")==0 ||
+        strcmp(s,"readonly")==0 ||
+        strcmp(s,"return")==0 ||
+        strcmp(s,"set")==0 ||
+        strcmp(s,"shift")==0 ||
+        strcmp(s,"shopt")==0 ||
+        strcmp(s,"source")==0 ||
+        strcmp(s,"suspend")==0 ||
+        strcmp(s,"test")==0 ||
+        strcmp(s,"times")==0 ||
+        strcmp(s,"trap")==0 ||
+        strcmp(s,"true")==0 ||
+        strcmp(s,"type")==0 ||
+        strcmp(s,"typeset")==0 ||
+        strcmp(s,"ulimit")==0 ||
+        strcmp(s,"umask")==0 ||
+        strcmp(s,"unalias")==0 ||
+        strcmp(s,"unset")==0 ||
+        strcmp(s,"wait")==0){
+
+        printf("%s is a shell builtin.\n",s);
+        return;
+    }
+
+
+    if((s[0] == '/' || s[0] == '.') && access(s, F_OK) == 0){ //命令在当前目录
+        strcpy(cmdBuff, s);
+        printf("%s is in the current directory.\n",s);
+        return ;
+    }else{  //查找ysh.conf文件中指定的目录，确定命令是否存在
+        while(envPath[i] != NULL){ //查找路径已在初始化时设置在envPath[i]中
+            strcpy(cmdBuff, envPath[i]);
+            strcat(cmdBuff, s);
+
+            if(access(cmdBuff, F_OK) == 0){ //命令文件被找到
+                printf("%s is in %s.\n",s,cmdBuff);
+                return ;
+            }
+
+            i++;
+        }
+    }
+    printf("%s is not found.\n",s);
+}
 /*******************************************************
                   信号以及jobs相关
 ********************************************************/
@@ -349,6 +435,7 @@ void CHLD(int sig, siginfo_t *sip, void* noused){
     waitpid(pid, NULL, 0);
     tcsetpgrp(0,getpid()); //恢复主进程到前台
     rmJob(pid);
+    if (pid != fgPid) tcsetpgrp(0,fgPid);
 }
 /*组合键命令ctrl+z*/
 void ctrl_Z(){
@@ -602,7 +689,7 @@ void init(){
 SimpleCmd* handleSimpleCmdStr(int begin, int end){
     int i, j, k;
     int fileFinished; //记录命令是否解析完毕
-    char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
+    char c, buff[100][40], inputFile[30], outputFile[30], *temp = NULL;
     SimpleCmd *cmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
 
 	//默认为非后台命令，输入输出重定向为null
@@ -924,6 +1011,17 @@ void execSimpleCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,in
 		else{
             printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
         }
+    } else if (strcmp(cmd->args[0],"echo") == 0) { //echo
+        for (i=1;cmd->args[i];i++) printf("%s ",cmd->args[i]);
+        printf("\n");
+    } else if (strcmp(cmd->args[0],"pwd") == 0) { // pwd
+        printf("%s\n",get_current_dir_name());
+    } else if (strcmp(cmd->args[0],"clear") == 0) { // clear
+        printf("\033[H\033[J");
+    } else if (strcmp(cmd->args[0],"reset") == 0) { // reset
+        printf("\033\143");
+    } else if (strcmp(cmd->args[0],"type") == 0) { //type
+        find_type(cmd->args[1]);
     } else{ //外部命令
         execOuterCmd(cmd, dup_flg, in_pid, out_pid , in_filedes , out_filedes, inputBuff_start);
     }

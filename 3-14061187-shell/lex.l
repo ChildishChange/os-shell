@@ -18,7 +18,7 @@ blank               ({blank_chars}*)
 
 arg                 ({character}+)
 
-args                ({blank}|(({arg}{blank_chars}{arg})*))
+args                ({blank}|({arg}({blank_chars}{arg})*))
 
 inputRedirect       ({blank}|(<{blank}{arg}))
 outputRedirect      ({blank}|(>{blank}{arg}))
