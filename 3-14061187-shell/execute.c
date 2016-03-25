@@ -924,7 +924,13 @@ void execSimpleCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,in
 		else{
             printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
         }
-    } else{ //外部命令
+    } else if (strcmp(cmd->args[0], "echo") == 0) {
+	for (i=0;cmd->args[i];i++) 
+		printf("%s ",cmd->args[i]);
+	printf("\n");
+    } else if (strcmp(cmd->args[0], "pwd") == 0) {
+	printf("%s\n",get_current_dir_name());
+    }  else{ //外部命令
         execOuterCmd(cmd, dup_flg, in_pid, out_pid , in_filedes , out_filedes, inputBuff_start);
     }
 
