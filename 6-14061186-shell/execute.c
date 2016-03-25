@@ -15,7 +15,7 @@
 
 #include "global.h"
 #define DEBUG
-int goon = 0, ii=0;       //用于设置signal信号量
+int goon = 0, ii=0, waitFlag=0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;                //作业头指针
@@ -38,7 +38,7 @@ void printLine()
     //char hostname[]="local";
     int hn_len=32;
 
-    if (errFlag) return;
+    if (errFlag||waitFlag) return;
     gethostname(hostname,hn_len);
 
     printf("\nE!%s@%s:%s$ ", pwd->pw_name, hostname, get_current_dir_name()); //打印提示符信息    
@@ -343,7 +343,7 @@ void doPipe(SimpleCmd *cmd)
             printf("%s\n", "管道定义重复");
             exit(0);
         }
-        if (!exists(p->args[0])) {
+        if (!exists(p->args[0])&&!builtin(p->args[0])) {
             printf("找不到命令 %s\n", p->args[0]);
             exit(0);
         }
@@ -436,19 +436,25 @@ void doPipe(SimpleCmd *cmd)
             }
             if (pipeIn!=0) close(pipeIn); 
             if (pipeOut!=1) close(pipeOut); 
-        if (!exists(p->args[0])) 
+        if (!exists(p->args[0])&&!builtin(p->args[0])) 
         {
             printf("不存在的命令:%s\n", p->args[0]);
             exit(0);
         }
         //printf("%s\n", "here");
-        justArgs(p->args[0]);            
-        //printf("%s\n", "here");
-        //printf("exec %s %s %d %s\n", p->args[0],p->args[1],getpid(), cmdBuff);
-        if(execv(cmdBuff, p->args) < 0){ //执行命令
-            printf("execv failed!\n");
-            exit(0);
+        if (!builtin(p->args[0])) 
+        {
+            justArgs(p->args[0]);            
+            //printf("%s\n", "here");
+            //printf("exec %s %s %d %s\n", p->args[0],p->args[1],getpid(), cmdBuff);
+            if(execv(cmdBuff, p->args) < 0){ //执行命令
+                printf("execv failed!\n");
+                exit(0);
+            }
         }       
+        else {
+            builtinCmd(p,0);
+        }
 }
 
 /*fg命令*/
@@ -557,8 +563,10 @@ void type_exec(char *cmd){
         printf("wait is a shell builtin");
     }
     else {
-        printf("%s is hashed",cmd);
+        exists(cmd);
+        printf("%s is %s",cmd,cmdBuff);
     }
+    printf("\n");
 }
 /*******************************************************
                     命令历史记录
@@ -752,14 +760,61 @@ void execOuterCmd(SimpleCmd *cmd){
     }    
 }
 
-/*执行命令*/
-void execSimpleCmd(SimpleCmd *cmd){
+int builtin(char *x)
+{
+    if (strcmp(x, "history") == 0 ||
+        strcmp(x, "exit") == 0 ||
+        strcmp(x, "bg") == 0 ||
+        strcmp(x, "fg") == 0 ||
+        strcmp(x, "cd") == 0 ||
+        strcmp(x, "echo") == 0 ||
+        strcmp(x, "type") == 0 ||
+        strcmp(x, "jobs") == 0 ||
+        strcmp(x, "wait") == 0 )
+    return 1;
+    return 0;
+}
+
+int builtinCmd(SimpleCmd *cmd, int needRedir)
+{
     int i, pid;
+    int pipeIn,pipeOut;
     char *temp;
     Job *now = NULL;
+
+//    printf("%s\n", cmd->args[0]);
+    // if (cmd->input!=NULL) printf("%s\n", cmd->input);
+    // if (cmd->output!=NULL) printf("%s\n", cmd->output);
+    if (needRedir&&cmd->next!=NULL) return 0;
+    if (needRedir)
+    {
+                if(cmd->input != NULL){ //存在输入重定向
+                    if((pipeIn = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
+                        printf("不能打开文件 %s！\n", cmd->input);
+                        return;
+                    }
+                    if(dup2(pipeIn, 0) == -1){
+                        printf("重定向标准输入错误！\n");
+                        return;
+                    }
+                    close(pipeIn);
+                }            
+                if(cmd->output != NULL){ //存在输出重定向
+                    if((pipeOut = open(cmd->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
+                        printf("不能打开文件 %s！\n", cmd->output);
+                        return ;
+                    }
+                    if(dup2(pipeOut, 1) == -1){
+                        printf("重定向标准输出错误！\n");
+                        return;
+                    close(pipeOut);
+                    }
+                }        
+    }
     
     if(strcmp(cmd->args[0], "exit") == 0) { //exit命令
         exit(0);
+        return 1;
     } else if (strcmp(cmd->args[0], "history") == 0) { //history命令
         if(history.end == -1){
             printf("尚未执行任何命令\n");
@@ -770,6 +825,7 @@ void execSimpleCmd(SimpleCmd *cmd){
             printf("%s\n", history.cmds[i]);
             i = (i + 1)%HISTORY_LEN;
         } while(i != (history.end + 1)%HISTORY_LEN);
+        return 1;
     } else if (strcmp(cmd->args[0], "jobs") == 0) { //jobs命令
         if(head == NULL){
             printf("尚无任何作业\n");
@@ -779,6 +835,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 printf("%d\t%d\t%d\t%s\t\t%s\n", i, now->pid, getpgid(now->pid), now->state, now->cmd);
             }
         }
+        return 1;
     } else if (strcmp(cmd->args[0], "cd") == 0) { //cd命令
         temp = cmd->args[1];
         if(temp != NULL){
@@ -786,6 +843,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 printf("cd; %s 错误的文件名或文件夹名！\n", temp);
             }
         }
+        return 1;
     } else if (strcmp(cmd->args[0], "fg") == 0) { //fg命令
         temp = cmd->args[1];
         if(temp != NULL && temp[0] == '%'){
@@ -796,6 +854,7 @@ void execSimpleCmd(SimpleCmd *cmd){
         }else{
             printf("fg; 参数不合法，正确格式为：fg %<int>\n");
         }
+        return 1;
     } else if (strcmp(cmd->args[0], "bg") == 0) { //bg命令
         temp = cmd->args[1];
         if(temp != NULL && temp[0] == '%'){
@@ -807,38 +866,57 @@ void execSimpleCmd(SimpleCmd *cmd){
         }else{
             printf("bg; 参数不合法，正确格式为：bg %<int>\n");
         }
+        return 1;
     } 
     else if (strcmp(cmd->args[0],"wait")==0){
-        while (head != NULL)
+        waitFlag=1;
+        while (1)
         {
-            if (head->state == "running"){
+            i=0;
+            for (now=head;now!=NULL;now=now->next)
+            if (strcmp(head->state,RUNNING)==0){
+                ++i;
+                break;
 
             }//blank
-            else if (head->state == "stopped" ){
-                continue;
-            }
+            if (i==0) break;
         }
+        waitFlag=0;
+        return 1;
     }//wait 
     else if(strcmp(cmd->args[0],"echo")==0){
         int count = 1;
-        temp = cmd->args[1];
-        if(temp != NULL){
-            while(temp != NULL){
-                echo_exec(temp);
-                putchar(' ');
-                 temp = cmd->args[++count];
-             }
-         }
-        else{
+        while(count<cmd->argc){
+            echo_exec(cmd->args[count++]);
+            printf(" ");
+        }
+        if (cmd->argc<2){
             printf("echo:illegal input,supposing echo [String]");
         }
+        printf("\n");
+        return 1;
     }//eho
     else if(strcmp(cmd->args[0],"type")==0){
         type_exec(cmd->args[1]);
+        return 1;
     }
-    else{ //外部命令
-        execOuterCmd(cmd);
+    return 0;
+}
+
+/*执行命令*/
+void execSimpleCmd(SimpleCmd *cmd){
+    int sdi = dup(STDIN_FILENO);
+    int sdo = dup(STDOUT_FILENO);
+    if (builtinCmd(cmd,1)) 
+    {
+        dup2(sdo,STDOUT_FILENO);
+        dup2(sdi,STDIN_FILENO);
+        return;
     }
+    dup2(sdo,STDOUT_FILENO);
+    dup2(sdi,STDIN_FILENO);
+    //外部命令
+    execOuterCmd(cmd);
     
     //释放结构体空间
     // for(i = 0; i < cmd->argc; ++i){
