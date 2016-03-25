@@ -520,6 +520,46 @@ void bg_exec(int pid){
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 }
 
+/*echo*/
+void echo_exec(char *cmd){
+    int i = 0;
+    for(i=0;cmd[i]!='\0';i++){
+        printf("%c",cmd[i]);
+    }
+}
+
+void type_exec(char *cmd){
+    if (strcmp(cmd,"bg")==0){
+        printf("bg is a shell builtin");
+    }
+    else if(strcmp(cmd,"cd")==0){
+        printf("cd is a shell builtin");
+    }
+    else if(strcmp(cmd,"echo")==0){
+        printf("echo is a shell builtin");
+    }
+    else if(strcmp(cmd,"exit")==0){
+        printf("exit is a shell builtin");
+    }
+    else if(strcmp(cmd,"fg")==0){
+        printf("fg is a shell builtin");
+    }
+    else if(strcmp(cmd,"history")==0){
+        printf("history is a shell builtin");
+    }
+    else if(strcmp(cmd,"jobs")==0){
+        printf("jobs is a shell builtin");
+    }
+    else if(strcmp(cmd,"type")==0){
+        printf("type is a shell builtin");
+    }
+    else if(strcmp(cmd,"wait")==0){
+        printf("wait is a shell builtin");
+    }
+    else {
+        printf("%s is hashed",cmd);
+    }
+}
 /*******************************************************
                     命令历史记录
 ********************************************************/
@@ -764,11 +804,39 @@ void execSimpleCmd(SimpleCmd *cmd){
             if(pid != -1){
                 bg_exec(pid);
             }
-        }
-		else{
+        }else{
             printf("bg; 参数不合法，正确格式为：bg %<int>\n");
         }
-    } else{ //外部命令
+    } 
+    else if (strcmp(cmd->args[0],"wait")==0){
+        while (head != NULL)
+        {
+            if (head->state == "running"){
+
+            }//blank
+            else if (head->state == "stopped" ){
+                continue;
+            }
+        }
+    }//wait 
+    else if(strcmp(cmd->args[0],"echo")==0){
+        int count = 1;
+        temp = cmd->args[1];
+        if(temp != NULL){
+            while(temp != NULL){
+                echo_exec(temp);
+                putchar(' ');
+                 temp = cmd->args[++count];
+             }
+         }
+        else{
+            printf("echo:illegal input,supposing echo [String]");
+        }
+    }//eho
+    else if(strcmp(cmd->args[0],"type")==0){
+        type_exec(cmd->args[1]);
+    }
+    else{ //外部命令
         execOuterCmd(cmd);
     }
     
