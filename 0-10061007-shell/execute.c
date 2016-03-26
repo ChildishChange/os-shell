@@ -214,6 +214,7 @@ void fg_exec(int pid){
     
     printf("%s\n", now->cmd);
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
+	sleep(1);
     waitpid(fgPid, NULL, 0); //父进程等待前台进程的运行
 }
 
@@ -508,6 +509,7 @@ void execOuterCmd(SimpleCmd *cmd){
             }
             
             justArgs(cmd->args[0]);
+			setpgid(0, 0); //Set child process to separate group
             if(execv(cmdBuff, cmd->args) < 0){ //执行命令
                 printf("execv failed!\n");
                 return;
@@ -517,6 +519,7 @@ void execOuterCmd(SimpleCmd *cmd){
             if(cmd ->isBack){ //后台命令             
                 fgPid = 0; //pid置0，为下一命令做准备
                 addJob(pid); //增加新的作业
+				sleep(1);
                 kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
                 
                 //等待子进程输出
@@ -575,7 +578,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 fg_exec(pid);
             }
         }else{
-            printf("fg; 参数不合法，正确格式为：fg %<int>\n");
+            printf("fg; 参数不合法，正确格式为：fg %%<int>\n");
         }
     } else if (strcmp(cmd->args[0], "bg") == 0) { //bg命令
         temp = cmd->args[1];
@@ -587,7 +590,7 @@ void execSimpleCmd(SimpleCmd *cmd){
             }
         }
 		else{
-            printf("bg; 参数不合法，正确格式为：bg %<int>\n");
+            printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
         }
     } else{ //外部命令
         execOuterCmd(cmd);
