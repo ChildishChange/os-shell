@@ -21,7 +21,7 @@ Job *head = NULL;                //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
 
 /*******************************************************
-                  工具以及辅助方法
+				  工具以及辅助方法
 ********************************************************/
 /*判断命令是否存在*/
 int exists(char *cmdFile){
@@ -241,6 +241,10 @@ void bg_exec(int pid){
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 }
 
+void sig_capture() {
+	printf("Signature Capture Here!\n");
+}
+
 /*******************************************************
                     命令历史记录
 ********************************************************/
@@ -320,6 +324,7 @@ void init(){
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
     signal(SIGTSTP, ctrl_Z);
+	signal(SIGTTOU, SIG_IGN);
 }
 
 /*******************************************************
@@ -522,13 +527,15 @@ void execOuterCmd(SimpleCmd *cmd){
 				sleep(1);
                 kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
                 
-                //等待子进程输出
+				//等待子进程输出
                 signal(SIGUSR1, setGoon);
                 while(goon == 0) ;
                 goon = 0;
             }else{ //非后台命令
                 fgPid = pid;
+				tcsetpgrp(STDIN_FILENO, fgPid);
                 waitpid(pid, NULL, 0);
+				tcsetpgrp(STDIN_FILENO, getpgrp());
             }
 		}
     }else{ //命令不存在
