@@ -43,7 +43,7 @@ extern "C" {
         struct PipeJob *next_pipe;
     }PipeJob;
 
-    char inputBuff[100];  //存放输入的命令
+    char inputBuff[10000];  //存放输入的命令
 
     void init();
     void addHistory(char *history);

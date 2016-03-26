@@ -40,6 +40,7 @@ void addwork(){
         addHistory(inputBuff);
     }
     printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
+    tcsetpgrp(0,getpid());
 }
 /****************************************************************
                   main主函数
@@ -56,11 +57,10 @@ int main(int argc, char** argv) {
 
     while(1){
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
-		//sleep(1);        
+		//sleep(1);
 		//printf("***");
         //while((c=getchar())!=EOF) printf("*%c*",c);
      }
 
     return (EXIT_SUCCESS);
 }
-
