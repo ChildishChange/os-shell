@@ -36,9 +36,17 @@ extern "C" {
     void init();
     void addHistory(char *history);
     void execute();
+    static char* builtin[]={".",":","[","alias","bg","bind","break","builtin","caller","cd",
+                                "command","compgen","complete","compopt","continue",
+                                "declare","dirs","disown","echo","enable","eval","exec","exit"
+                                "export","false","fc","fg","getopts","hash","help","history",
+                                "jobs","kill","let","local","logout","mapfile","popd","printf",
+                                "pushd","pwd","read","readarray","readonly","return","set",
+                                "shift","shopt","suorce","suspend","test","times","trap","true",
+                                "type","typeset","ulimit","umask","unalias","unset","wait",NULL
+                            };
 
 #ifdef	__cplusplus
 }
 #endif
-
 #endif	/* _global_H */

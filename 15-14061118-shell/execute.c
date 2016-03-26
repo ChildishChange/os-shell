@@ -169,6 +169,49 @@ void bg_exec(int pid){
     killpg(getpgid(pid), SIGCONT); //向对象作业发送SIGCONT信号，使其运行
 }
 
+/*type*/
+void type_exec(char* s[]){
+    int i,j;
+    int flag = 0;
+    int isBuiltin=0;
+    //type have args -t -at -p -P
+    if(strcmp(s[1],"-t")==0 || strcmp(s[1],"-at")==0||
+        strcmp(s[1],"-p")==0||strcmp(s[1],"-P")==0){
+        flag = 1;
+    }
+    for(i=1+flag;s[i]!=NULL;i++){
+        isBuiltin = 0;
+        //check is or not builtin order
+        for(j=0;builtin[j]!=NULL;j++){
+            if(strcmp(s[i],builtin[j])==0){
+                isBuiltin=1;
+                break;
+            }
+        }
+        //print
+        if(isBuiltin==1){
+            printf("%s is built in the shell\n",s[i] );
+        }
+        else if(exists(s[i])){
+             printf("%s is an outer order\n",s[i] );
+        }
+        else{
+            printf("type: can not find %s \n",s[i] );   
+        }
+    }
+
+}
+
+/*echo*/
+void echo_exec(char* s[]){
+    int i;
+    for(i=1;s[i]!=NULL;i++){
+        printf("%s ",s[i]);
+    }
+    printf("\n");
+}
+
+
 /*******************************************************
                     命令历史记录
 ********************************************************/
@@ -562,7 +605,13 @@ void execSimpleCmd(SimpleCmd *cmd){
 		else{
             printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
         }
-    } else{ //外部命令
+    }else if(strcmp(cmd->args[0],"type")==0){
+            type_exec(cmd->args);
+    } 
+    else if(strcmp(cmd->args[0],"echo")==0){
+        echo_exec(cmd->args);
+    }
+    else{ //外部命令
         execOuterCmd(cmd);
     }
     
