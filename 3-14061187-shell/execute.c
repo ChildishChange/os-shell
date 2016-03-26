@@ -555,7 +555,7 @@ void bg_exec(int pid){
     Job *now = NULL;
     int i;
     //SIGCHLD信号产生自此函数
-    ignore = 1;
+    ignore = 0;
 
     //检测是否为pipe
     for(i=1;i<=pipe_n;i++){
@@ -942,6 +942,7 @@ void execOuterCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,int
                     tcsetpgrp(0,in_pid);
                 }*/
                 //tcsetpgrp(1,pid);
+                //ignore = 0;
                 if (!dup_flg) {
                     waitpid(pid, NULL, 0);
                     tcsetpgrp(0,getpid());
@@ -1039,6 +1040,7 @@ void execSimpleCmd(SimpleCmd *cmd, int dup_flg, pid_t in_pid, pid_t *out_pid ,in
 ********************************************************/
 void execute(){
     pid_t pid;
+    ignore = 0;
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
     stop_wait = 0;
     execSimpleCmd(cmd, 0, 0, &pid, 0, 0, 0);
@@ -1052,7 +1054,7 @@ void execute2(){
     pid_t *pid;
     pid = pipe_pid;
 
-
+    ignore = 0;
     stop_wait = 0;
     len=strlen(inputBuff);
 
@@ -1099,4 +1101,3 @@ void execute2(){
     stop_wait = 0;
     tcsetpgrp(0,getpid());
 }
-
