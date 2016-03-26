@@ -9,7 +9,7 @@ string {char}+
 
 %%
 
-\n {return 0;};
+\n {return END;};
 {space} {strcat(inputBuff,yytext);};
 \< {strcat(inputBuff,yytext);return '<';};
 \> {strcat(inputBuff,yytext);return '>';};

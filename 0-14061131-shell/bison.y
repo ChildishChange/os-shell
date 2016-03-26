@@ -8,11 +8,11 @@
     int commandDone,error;
 %}
 
-%token STRING
+%token STRING END
 
 %%
-line            :   /* empty */		{error=0;return;}
-                    |command 		{if(error==0) {cmd->args[k]=NULL; if(isPipe){cmd2->args[k2]=NULL;	pipeCmd(cmd,cmd2);}
+line            :   /* empty */	END	{error=0;return;}
+                    |command  	END	{if(error==0) {cmd->args[k]=NULL; if(isPipe){cmd2->args[k2]=NULL;	pipeCmd(cmd,cmd2);}
 														else{	execSimpleCmd(cmd); }
 														commandDone = 1;
 														} 
@@ -97,6 +97,15 @@ SimpleCmd* newSimpleCmd(){
 	cmd->args = (char**)malloc(sizeof(char*) * 101);
 	return cmd;
 }
+void freeCmd(SimpleCmd* cmd){
+	int i;
+	for(i = 0; cmd->args[i] != NULL; i++){
+		free(cmd->args[i]);
+		free(cmd->input);
+		free(cmd->output);
+	    }
+		free(cmd);
+}
 
 int main(int argc, char** argv) {
      int i;
@@ -109,10 +118,8 @@ int main(int argc, char** argv) {
     printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
 
 
-    while(1){
-		while((c=getchar())==-1);
-			ungetc(c,stdin);
-
+    while(1){	
+		
 		cmd = newSimpleCmd();
 		cmd->isBack = 0;
 		isPipe = 0;
@@ -120,22 +127,21 @@ int main(int argc, char** argv) {
 		done = 0;	
 		
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
-
+	
         if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息
             commandDone = 0;
             addHistory(inputBuff);
         }
 
-		for(i = 0; cmd->args[i] != NULL; i++){
-        free(cmd->args[i]);
-        free(cmd->input);
-        free(cmd->output);
-    }
-	free(cmd);
-
-        if(error==0){
+	freeCmd(cmd);
+	if(isPipe){freeCmd(cmd2);}
+	usleep(100);
+    if(error==0){
         	printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
-		}
+			if((c=getchar())!=-1);{
+			ungetc(c,stdin);
+			}
+	}
 		inputBuff[0]=0;
      }
 
