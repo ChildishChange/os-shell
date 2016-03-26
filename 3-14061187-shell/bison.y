@@ -39,7 +39,7 @@ void addwork(){
         commandDone = 0;
         addHistory(inputBuff);
     }
-    printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
+
     tcsetpgrp(0,getpid());
 }
 /****************************************************************
@@ -57,6 +57,7 @@ int main(int argc, char** argv) {
 
     while(1){
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
+        printf("yourname@computer:%s$ ", get_current_dir_name()); //打印提示符信息
 		//sleep(1);
 		//printf("***");
         //while((c=getchar())!=EOF) printf("*%c*",c);
@@ -64,3 +65,4 @@ int main(int argc, char** argv) {
 
     return (EXIT_SUCCESS);
 }
+

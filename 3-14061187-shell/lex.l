@@ -10,7 +10,7 @@
     #define YY_INPUT(buf, retval, maxlen)	(retval = my_getinput(buf, maxlen))
 %}
 
-character           ([-a-zA-Z_0-9./%])
+character           ([-a-zA-Z_0-9./%~])
 
 blank_chars         ([ \f\r\t\v]+)
 
