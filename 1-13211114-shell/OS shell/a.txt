@@ -1,0 +1,5 @@
+examples.desktop
+execute.c
+execute.c~
+execute.o
+test.c~
