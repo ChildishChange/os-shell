@@ -891,7 +891,7 @@ int builtinCmd(SimpleCmd *cmd, int needRedir)
             printf(" ");
         }
         if (cmd->argc<2){
-            printf("echo:illegal input,supposing echo [String]");
+            printf("echo:illegal input,requiring echo [String]");
         }
         printf("\n");
         return 1;
