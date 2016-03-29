@@ -23,14 +23,18 @@
 
 line            :	'\n'	{return 0;}
 					|command '\n'	{
-						execute(tmp);
+						cmds = (SimpleCmd**)malloc(sizeof(SimpleCmd*));
+						n = 0;
+						cmds[n++] = tmp;
+						mallocTmp();
+				        executeCmds(cmds, n);		
 						dumpTmp();
+                        freeCmds();
 						commandDone = 1;
 						return 0;
 					}
 					|chainCmd command '\n'	{
-						cmds[n] = tmp;
-						cmds[n++]->pflag = 3;
+						cmds[n++] = tmp;
 						mallocTmp();
 						executeCmds(cmds, n);
 						dumpTmp();
@@ -43,13 +47,11 @@ line            :	'\n'	{return 0;}
 chainCmd		:	command '|'	{
 						cmds = (SimpleCmd**)malloc(sizeof(SimpleCmd*));
 						n = 0;
-						cmds[n] = tmp;
-						cmds[n++]->pflag = 1;
+						cmds[n++] = tmp;
 						mallocTmp();
 					}
-					|chainCmd '|'	{
-						cmds[n] = tmp;
-						cmds[n++]->pflag = 2;
+					|chainCmd command '|'	{
+						cmds[n++] = tmp;
 						mallocTmp();
 					}
 
