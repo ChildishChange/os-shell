@@ -15,7 +15,7 @@
 #include "global.h"
 #define DEBUG
 int blocked = 1;       //用于设置signal信号量
-int pl[2], pr[2], plvalid, prvalid;	//用于存放管道文件描述符和管道口状态，即是否有效可读
+int fildes[2];	//用于存放管道文件描述符
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;                //作业头指针
@@ -31,7 +31,12 @@ extern void pCmds();
 void perr(){
     printf("errno:%d\n", errno);
 }
-
+void pPipe(SimpleCmd *cmd, int pi, int po){
+    printf("cmd:%s\tpflag:%d\n", cmd->args[0], cmd->pflag);
+    printf("input:%s\toutput:%s\n", cmd->input, cmd->output);
+    printf("ipipe:%d\topipe:%d\n", pi, po);
+    printf("fildes0:%d\tfildes1:%d\n", fildes[0], fildes[1]);
+}
 
 /*******************************************************
                   工具以及辅助方法
@@ -93,12 +98,51 @@ void justArgs(char *str){
     }
 }
 
-/*释放环境变量空间*/
+/*释放空间*/
 void release(){
     int i;
     for(i = 0; strlen(envPath[i]) > 0; i++){
         free(envPath[i]);
     }
+}
+
+/*预处理管道链*/
+void pretreat(SimpleCmd **cmds, int n){
+    int i;
+    if (n <= 1){
+        cmds[0]->pflag = 0;
+        return;
+    }
+    for (i = 0; i <= n - 1; i++){
+        if (i == 0){
+            if (cmds[i]->output != NULL){
+                cmds[i]->pflag = 0;
+            } else {
+                cmds[i]->pflag = 2;
+            }
+        } else if (i == n - 1){
+            if (cmds[i]->input != NULL){
+                cmds[i]->pflag = 0;
+            } else {
+                cmds[i]->pflag = 1;
+            }
+        } else {
+            if (cmds[i]->input != NULL && cmds[i]->output != NULL){
+                cmds[i]->pflag = 0;
+            } else if (cmds[i]->input != NULL){
+                cmds[i]->pflag = 2;
+            } else if (cmds[i]->output != NULL){
+                cmds[i]->pflag = 1;
+            } else {
+                cmds[i]->pflag = 3;
+            }
+        }
+    }
+}
+
+void buildPipe(){
+    pipe(fildes);
+    fcntl(fildes[0], F_SETFL, O_NONBLOCK); 
 }
 
 /*******************************************************
@@ -308,6 +352,7 @@ void init(){
     while(read(fd, &c, 1) != 0){ 
         buf[len++] = c;
     }
+    close(fd);
     buf[len] = '\0';
 
     //将环境路径存入envPath[]
@@ -329,101 +374,67 @@ void init(){
                       命令执行
 ********************************************************/
 /*重定向*/
-void ioReAlloc(SimpleCmd *cmd, pid_t pid){
-    int pipeIn = 0, pipeOut = 1;
-    if(cmd->input != NULL && cmd->output != NULL){ //存在输入输出重定向
-        if((pipeIn = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
-            printf("不能打开文件 %s！\n", cmd->input);
-            return;
-        }
-        if((pipeOut = open(cmd->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
-            printf("不能打开文件 %s！\n", cmd->output);
-            return ;
-        }
-        plvalid = prvalid = 0; //断链
-    } else if (cmd->input != NULL){ //只存在输入重定向
-        if((pipeIn = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
-            printf("不能打开文件 %s！\n", cmd->input);
-            return;
-        }
-        if (cmd->pflag == 1 || cmd->pflag == 2){
-            if (plvalid){
-                pipeOut = pr[1];
-                plvalid--;
-                prvalid++;
-            } else if (prvalid){
-                pipeOut = pl[1];
-                plvalid++;
-                prvalid--;
-            } else {
-                pipeOut = pr[1];
-                prvalid++;
-            }
-        } else plvalid = prvalid = 0; //断链
-    } else if (cmd->output != NULL){ //只存在输出重定向
-        if((pipeOut = open(cmd->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
-            printf("不能打开文件 %s！\n", cmd->output);
-            return ;
-        }
-        if (cmd->pflag == 2 || cmd->pflag == 3){
-            if (plvalid){
-                pipeIn = pl[0];
-                plvalid--;
-            } else if (prvalid){
-                pipeIn = pr[0];
-                prvalid--;
-            }
-        } else plvalid = prvalid = 0; //断链
-    } else { //不存在重定向
-        if (cmd->pflag == 1){
-            if (plvalid){
-                pipeOut = pr[1];
-                plvalid--;
-                prvalid++;
-            } else if (prvalid){
-                pipeOut = pl[1];
-                plvalid++;
-                prvalid--;
-            } else {
-                pipeOut = pr[1];
-                prvalid++;
-            }
-        } else if (cmd->pflag == 2){
-            if (plvalid){
-                pipeIn = pl[0];
-                pipeOut = pr[1];
-                plvalid--;
-                prvalid++;
-            } else if (prvalid){
-                pipeIn = pr[0];
-                pipeOut = pl[1];
-                plvalid++;
-                prvalid--;
-            } else {
-                pipeOut = pr[1];
-                prvalid++;
-            }
-        } else if (cmd->pflag == 3){
-            if (plvalid){
-                pipeIn = pl[0];
-                plvalid--;
-            } else if (prvalid){
-                pipeIn = pr[0];
-                prvalid--;
-            }
-        }
+void ioAlloc(i, o){
+    if (dup2(i, 0) < 0){
+        printf("error in dup2 input");    
     }
-    if (pid == 0){ //子进程
-        if(dup2(pipeIn, 0) == -1 || dup2(pipeOut, 1) == -1){
-            printf("重定向标准错误！\n");
-            close(pl[0]);
-            close(pl[1]);
-            close(pr[0]);
-            close(pr[1]);
-            return;
-        }
+    if (dup2(o, 1) < 0){
+        printf("error in dup2 output");
     }
 }
+
+void ioDirec(SimpleCmd *cmd, pid_t pid){
+    int i = 0, o = 1;
+    char buf[PIPEBUFSIZE];
+    if(cmd->pflag == 0){ //不用管道
+        if(cmd->input != NULL && (i = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
+            printf("不能打开文件 %s！\n", cmd->input);
+            return;
+        }
+        if(cmd->output != NULL && (o = open(cmd->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
+            printf("不能打开文件 %s！\n", cmd->output);
+            return ;
+        }
+        if (pid == 0){
+            //close(fildes[0]);
+            //close(fildes[1]);
+            while (read(fildes[1], buf, PIPEBUFSIZE) > 0);
+            pPipe(cmd, i, o);
+            ioAlloc(i, o);
+        }
+    } else if (cmd->pflag == 1){ //只用管道读         
+        if(cmd->output != NULL && (o = open(cmd->output, O_WRONLY|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR)) == -1){
+            printf("不能打开文件 %s！\n", cmd->output);
+            return ;
+        }
+        i = fildes[0];
+        if (pid == 0){
+            //close(fildes[1]);
+            pPipe(cmd, i, o);
+            ioAlloc(i, o);
+        }
+    } else if (cmd->pflag == 2){ //只用管道写
+        if(cmd->input != NULL && (i = open(cmd->input, O_RDONLY, S_IRUSR|S_IWUSR)) == -1){
+            printf("不能打开文件 %s！\n", cmd->input);
+            return;
+        }
+        o = fildes[1];
+        if (pid == 0){
+            //close(fildes[0]);
+            while (read(fildes[1], buf, PIPEBUFSIZE) > 0);
+            pPipe(cmd, i, o);
+            ioAlloc(i, o);
+        }
+    } else { //不存在重定向
+        i = fildes[0];
+        o = fildes[1];
+        if (pid == 0){
+            pPipe(cmd, i, o);
+            ioAlloc(i, o);
+        }        
+    }
+}
+
 
 /*执行外部命令*/
 void execOuterCmd(SimpleCmd *cmd){
@@ -435,7 +446,7 @@ void execOuterCmd(SimpleCmd *cmd){
             return;
         }
 
-        ioReAlloc(cmd, pid);
+        ioDirec(cmd, pid);
         if(pid == 0){ //子进程
             if (cmd->pflag == 0 || cmd->pflag == 1){
                 setpgid(0, 0);
@@ -609,21 +620,13 @@ void execSimpleCmd(SimpleCmd *cmd){
 /******************************************************
                      命令执行接口
 ********************************************************/
-void execute(SimpleCmd *cmd){
-    execSimpleCmd(cmd);
-}
-
 void executeCmds(SimpleCmd **cmds, int n){
     int i;
-    pipe(pl);
-    pipe(pr);
-    plvalid = prvalid = 0;
+    buildPipe();
+    pretreat(cmds, n);
     for (i = 0; i <= n - 1; i++){
-        execute(cmds[i]);
+        execSimpleCmd(cmds[i]);
     }
-    plvalid = prvalid = 0;
-    close(pl[0]);
-    close(pl[1]);
-    close(pr[0]);
-    close(pr[1]);
-}
+    close(fildes[0]);
+    close(fildes[1]);
+} 

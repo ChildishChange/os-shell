@@ -8,6 +8,7 @@ extern "C" {
     #define HISTORY_LEN 10
 	#define ARGCMAX 10
 	#define ARGLENMAX 40
+    #define PIPEBUFSIZE 4096
     
     #define STOPPED "stopped"
     #define RUNNING "running"
@@ -41,7 +42,6 @@ extern "C" {
     
     void init();
     void addHistory(char *history);
-    void execute(SimpleCmd *cmd);
 	void executeCmds(SimpleCmd **cmds, int n);
 
 #ifdef	__cplusplus
