@@ -21,7 +21,7 @@ Job *head = NULL;                //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
 
 /*******************************************************
-				  工具以及辅助方法
+                  工具以及辅助方法
 ********************************************************/
 /*判断命令是否存在*/
 int exists(char *cmdFile){
@@ -214,7 +214,6 @@ void fg_exec(int pid){
     
     printf("%s\n", now->cmd);
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
-	sleep(1);
     waitpid(fgPid, NULL, 0); //父进程等待前台进程的运行
 }
 
@@ -239,10 +238,6 @@ void bg_exec(int pid){
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
     
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
-}
-
-void sig_capture() {
-	printf("Signature Capture Here!\n");
 }
 
 /*******************************************************
@@ -324,7 +319,6 @@ void init(){
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
     signal(SIGTSTP, ctrl_Z);
-	signal(SIGTTOU, SIG_IGN);
 }
 
 /*******************************************************
@@ -514,7 +508,6 @@ void execOuterCmd(SimpleCmd *cmd){
             }
             
             justArgs(cmd->args[0]);
-			setpgid(0, 0); //Set child process to separate group
             if(execv(cmdBuff, cmd->args) < 0){ //执行命令
                 printf("execv failed!\n");
                 return;
@@ -524,18 +517,15 @@ void execOuterCmd(SimpleCmd *cmd){
             if(cmd ->isBack){ //后台命令             
                 fgPid = 0; //pid置0，为下一命令做准备
                 addJob(pid); //增加新的作业
-				sleep(1);
                 kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
                 
-				//等待子进程输出
+                //等待子进程输出
                 signal(SIGUSR1, setGoon);
                 while(goon == 0) ;
                 goon = 0;
             }else{ //非后台命令
                 fgPid = pid;
-				tcsetpgrp(STDIN_FILENO, fgPid);
                 waitpid(pid, NULL, 0);
-				tcsetpgrp(STDIN_FILENO, getpgrp());
             }
 		}
     }else{ //命令不存在
@@ -585,7 +575,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 fg_exec(pid);
             }
         }else{
-            printf("fg; 参数不合法，正确格式为：fg %%<int>\n");
+            printf("fg; 参数不合法，正确格式为：fg %<int>\n");
         }
     } else if (strcmp(cmd->args[0], "bg") == 0) { //bg命令
         temp = cmd->args[1];
@@ -597,7 +587,7 @@ void execSimpleCmd(SimpleCmd *cmd){
             }
         }
 		else{
-            printf("bg; 参数不合法，正确格式为：bg %%<int>\n");
+            printf("bg; 参数不合法，正确格式为：bg %<int>\n");
         }
     } else{ //外部命令
         execOuterCmd(cmd);
