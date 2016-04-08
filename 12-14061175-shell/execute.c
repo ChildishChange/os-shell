@@ -106,7 +106,6 @@ Job* addJob(pid_t pid){
     strcpy(job->cmd, inputBuff);
     strcpy(job->state, RUNNING);
     job->next = NULL;
-    printf("%s %d\n","addJob:",pid);   
  
     if(head == NULL){ //若是第一个job，则设置为头指针
         head = job;
@@ -252,6 +251,48 @@ void bg_exec(int pid){
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
     
     kill(now->pid, SIGCONT); //向对象作业发送SIGCONT信号，使其运行
+}
+
+/*type*/
+void type_exec(char* s[]){
+    int i,j;
+    int flag = 0;
+    int isBuiltin=0;
+    //type have args -t -at -p -P
+    if(strcmp(s[1],"-t")==0 || strcmp(s[1],"-at")==0||
+        strcmp(s[1],"-p")==0||strcmp(s[1],"-P")==0){
+        flag = 1;
+    }
+    for(i=1+flag;s[i]!=NULL;i++){
+        isBuiltin = 0;
+        //check is or not builtin order
+        for(j=0;builtin[j]!=NULL;j++){
+            if(strcmp(s[i],builtin[j])==0){
+                isBuiltin=1;
+                break;
+            }
+        }
+        //print
+        if(isBuiltin==1){
+            printf("%s is built in the shell\n",s[i] );
+        }
+        else if(exists(s[i])){
+             printf("%s is an outer order\n",s[i] );
+        }
+        else{
+            printf("type: can not find %s \n",s[i] );
+        }
+    }
+
+}
+
+/*echo*/
+void echo_exec(char* s[]){
+    int i;
+    for(i=1;s[i]!=NULL;i++){
+        printf("%s ",s[i]);
+    }
+    printf("\n");
 }
 
 /*******************************************************
@@ -522,7 +563,6 @@ void execOuterCmd(SimpleCmd *cmd){
 		else{ //父进程
             if(cmd ->isBack){ //后台命令             
                 fgPid = 0; //pid置0，为下一命令做准备
-                printf("%s\n","jin ru addJob");
                 addJob(pid); //增加新的作业
                 signal(SIGUSR1,setGoon);
                 sleep(1); 
@@ -560,9 +600,7 @@ void execSimpleCmd(SimpleCmd *cmd){
             i = (i + 1)%HISTORY_LEN;
         } while(i != (history.end + 1)%HISTORY_LEN);
     } else if (strcmp(cmd->args[0], "jobs") == 0) { //jobs命令
-        printf("%s\n","jobs yi jin ru");
         if(head == NULL){
-          printf("%s\n","cuo wu");  
           printf("尚无任何作业\n");
         } else {
             printf("index\tpid\tstate\t\tcommand\n");
@@ -599,6 +637,10 @@ void execSimpleCmd(SimpleCmd *cmd){
 		else{
             printf("bg; 参数不合法，正确格式为：bg %<int>\n");
         }
+    } else if (strcmp(cmd->args[0], "type") == 0) { //type
+        type_exec(cmd->args);
+    } else if (strcmp(cmd->args[0], "echo") == 0) { //echo
+        echo_exec(cmd->args);
     } else{ //外部命令
         execOuterCmd(cmd);
     }
@@ -675,13 +717,11 @@ void execComplexCmd(ComplexCmd *cmd){
                    fgCid[cidCnt++] = pid;
                    if (pfd[0][0] != 0) close(pfd[0][0]);
                    if (pfd[1][1] != 1) close(pfd[1][1]);
-                   if (head == NULL) printf("%s %d\n","fuhead==NULL:",i);
                    pfd[0][0] = pfd[1][0];
          } else {
                  dup2(pfd[0][0],0);
                  dup2(pfd[1][1],1);
                  execSimpleCmd(cmd->cmds[i]);
-                 if (head == NULL) printf("%s %d\n","head == NULL:",i); 
                  close(pfd[0][0]);
                  close(pfd[1][1]);
                  exit(0);
@@ -692,8 +732,6 @@ void execComplexCmd(ComplexCmd *cmd){
     while ((pid = wait(NULL))>0);
 
     for (i = 0; i<cmd->num; i++) free(cmd->cmds[i]); 
-    printf("%s %d\n","head == NULL:",(head == NULL));
-
 } 
 
 /*******************************************************
@@ -701,10 +739,10 @@ void execComplexCmd(ComplexCmd *cmd){
 ********************************************************/
 void execute(){
     ComplexCmd *cmd = handleComplexCmdStr(0,strlen(inputBuff)); 
+    printf("%s\n",inputBuff); 
     if (cmd->num == 1) {
-       if (head == NULL) printf("%s\n","head == NULL qian");
        execSimpleCmd(cmd->cmds[0]);
     }
-    else { execComplexCmd(cmd); if (head == NULL) printf("%s\n","head == NULL hou");
+    else { execComplexCmd(cmd); 
     }
 }

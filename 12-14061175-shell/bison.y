@@ -18,7 +18,14 @@ command         :   fgCommand
                     |fgCommand '&'
 ;
 
-fgCommand       :   simpleCmd
+fgCommand       :   complexCmd
+;
+
+complexCmd      :   simpleCmd pipeCmd
+;
+
+pipeCmd         :   /* empty */
+                    |pipeCmd '|' simpleCmd
 ;
 
 simpleCmd       :   progInvocation inputRedirect outputRedirect
@@ -44,7 +51,7 @@ args            :   /* empty */
 /****************************************************************
                   词法分析函数
 ****************************************************************/
-int yylex(){
+/*int yylex(){
     //这个函数用来检查inputBuff是否满足lex的定义，实际上并不进行任何操作，初期可略过不看
     int flag;
     char c;
@@ -82,7 +89,7 @@ int yylex(){
         return 0;
     }
 }
-
+*/
 /****************************************************************
                   错误信息执行函数
 ****************************************************************/
@@ -105,11 +112,6 @@ int main(int argc, char** argv) {
 
     while(1){
         i = 0;
-        while((c = getchar()) != '\n'){ //读入一行命令
-            inputBuff[i++] = c;
-        }
-        inputBuff[i] = '\0';
-
         len = i;
         offset = 0;
         
