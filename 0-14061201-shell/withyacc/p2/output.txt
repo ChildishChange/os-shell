@@ -1,4 +1,0 @@
-total 0
--rw-rw-r-- 1 pi pi 0 Mar 21 17:22 input1.txt
--rw-rw-r-- 1 pi pi 0 Mar 21 17:22 output2.txt
--rw-rw-r-- 1 pi pi 0 Mar 21 17:23 output.txt
