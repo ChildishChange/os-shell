@@ -1,0 +1,29 @@
+In file included from execute.c:4:0:
+global.h:23:10: error: expected ‘{’ before ‘char’
+   struct char cmd[MAX_STRING_LENGTH];
+          ^
+global.h:23:10: error: two or more data types in declaration specifiers
+execute.c: In function ‘execute’:
+execute.c:109:8: warning: implicit declaration of function ‘chdir’ [-Wimplicit-function-declaration]
+    if (chdir(CmdList[i]->args[1])<0) printf("No such Direcotry\n");
+        ^
+execute.c:111:4: warning: implicit declaration of function ‘getcwd’ [-Wimplicit-function-declaration]
+    getcwd(pwd,100);
+    ^
+execute.c: In function ‘printJobs’:
+execute.c:144:37: error: ‘Job {aka struct Job}’ has no member named ‘Cmd’
+   printf("[%d]    %s\n",now->pid,now->Cmd);
+                                     ^
+execute.c:145:12: error: ‘Job {aka struct Job}’ has no member named ‘next’
+   now = now->next;
+            ^
+In file included from mysh.lex:3:0:
+global.h:23:10: error: expected ‘{’ before ‘char’
+   struct char cmd[MAX_STRING_LENGTH];
+          ^
+global.h:23:10: error: two or more data types in declaration specifiers
+In file included from mysh.y:4:0:
+global.h:23:10: error: expected ‘{’ before ‘char’
+   struct char cmd[MAX_STRING_LENGTH];
+          ^
+global.h:23:10: error: two or more data types in declaration specifiers
